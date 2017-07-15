@@ -77,7 +77,7 @@ def train_model(model, batch_size=128, epochs=10, validation_split=0, min_size=5
     model.fit(I, V, callbacks=[logger], epochs=epochs, batch_size=batch_size, validation_split=validation_split)
 
 
-def lengthy_test(model, testrange=[5,10,20,40,80], training_epochs=512):
+def lengthy_test(model=model_LSTM, testrange=[5,10,20,40,80], training_epochs=512):
     ts = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
     log_path = LOG_PATH_BASE + ts + "_-_" + "LSTM" 
     print ("creating:" + log_path) 
@@ -92,6 +92,5 @@ def lengthy_test(model, testrange=[5,10,20,40,80], training_epochs=512):
     for i in testrange:
         acc = test_model(model, min_size=i)
         print("the accuracy for length {0} was: {1}%%".format(i,acc))
-    tb = None
     return
 

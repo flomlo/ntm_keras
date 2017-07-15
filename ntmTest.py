@@ -11,7 +11,7 @@ from theano import tensor, function
 
 from keras.datasets import mnist
 from keras.models import Sequential
-from keras.layers.core import Dropout, Activation, Flatten, Masking
+from keras.layers.core import Dropout, Activation, Flatten, Masking, Dense
 from keras.layers.recurrent import LSTM
 from keras.utils import np_utils, generic_utils
 from keras.layers.wrappers import TimeDistributed
@@ -37,13 +37,15 @@ clipnorm = 10
 def gen_model():
     KB.clear_session()
     model = Sequential()
-    ntm = NTM(h_dim, n_slots=n_slots, m_length=m_length, shift_range=3,
+    ntm = NTM(2*h_dim, n_slots=n_slots, m_length=m_length, shift_range=3,
               inner_rnn='lstm',
               return_sequences=True,
-              input_shape=(128, input_dim) #fix 128 to None
+              input_shape=(None, input_dim), 
+              batch_size = batch_size
               )
     model.add(ntm)
-    model.add(TimeDistributed(Dense(input_dim)))
+    import pudb; pu.db
+    model.add(TimeDistributed(Dense(units=input_dim)))
     model.add(Activation('sigmoid'))
 
     sgd = Adam(lr=lr, clipnorm=clipnorm)
