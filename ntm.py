@@ -168,10 +168,13 @@ class NeuralTuringMachine(Recurrent):
 
         # initial memory, state, read and write vectors
         #
-        self.M = K.variable(value=(.001*np.ones((1,))), name="main_memory")
-        self.init_h = K.zeros(shape=(1,self.output_dim), name="state_vector")
-        self.init_wr = K.variable(np.ones(self.n_slots)/self.n_slots, name="read_vector")
-        self.init_ww = K.variable(np.ones(self.n_slots)/self.n_slots, name="write_vector")
+        # flat memory
+        self.M = K.variable(value=(.001*np.ones((1, self.n_slots * self.m_length))), name="main_memory")
+#       # alternativly, 2d-memory
+#        self.M = K.variable(value=(.001*np.ones((1, self.n_slots, self.m_length))), name="main_memory")
+        self.init_h = K.zeros(shape=(1, self.output_dim), name="state_vector")
+        self.init_wr = K.variable(np.ones((1, self.n_slots))/self.n_slots, name="read_vector")
+        self.init_ww = K.variable(np.ones((1, self.n_slots))/self.n_slots, name="write_vector")
 
         # write: erase, then add.
         self.W_e = self.rnn.kernel_initializer((self.output_dim, self.m_length))  # erase
@@ -217,9 +220,9 @@ class NeuralTuringMachine(Recurrent):
             self.W_s_read, self.b_s_read,
             self.W_k_write, self.b_k_write,
             self.W_s_write, self.b_s_write,
-            self.W_c_write, self.b_c_write,
-            self.M,
-            self.init_h, self.init_wr, self.init_ww]
+            self.W_c_write, self.b_c_write,]
+#            self.M,
+#            self.init_h, self.init_wr, self.init_ww]
 
         if self.inner_rnn == 'lstm':
             self.init_c = K.zeros((1,self.output_dim), name="init_controller")
@@ -230,8 +233,11 @@ class NeuralTuringMachine(Recurrent):
     def _read(self, w, M):
         return K.sum((w[:, :, None]*M),axis=1)
 
+    # See chapter 3.2
     def _write(self, w, e, a, M):
+        # see equation (3)
         Mtilda = M * (1 - w[:, :, None]*e[:, None, :])
+        # see equation (4)
         Mout = Mtilda + w[:, :, None]*a[:, None, :]
         return Mout
 
@@ -263,6 +269,7 @@ class NeuralTuringMachine(Recurrent):
 
     def get_initial_state(self, X):
         batch_size = K.int_shape(X)[0]
+        import pudb; pu.db
         #FIXME! 
         batch_size = self.batch_size
 #       # only commented the following out because its so hillariously bonkers.
@@ -273,6 +280,7 @@ class NeuralTuringMachine(Recurrent):
         
         #FIXME: Why is the memory flattened at all, only to be unflattened later?
         init_M = K.ones((batch_size, self.n_slots * self.m_length))*0.001
+        #init_M = K.repeat(self.M, 
 #       # the bonkers code from above, in case its actually necessary (metadata)        
 #        init_M = K.batch_flatten(K.repeat(K.repeat(K.repeat(K.FIXME ,
 #                                                            batch_size, axis=0),
