@@ -7,6 +7,8 @@ np.random.seed(124)
 import matplotlib.pyplot as plt
 #import cPickle
 
+from copyTask import lengthy_test
+
 from theano import tensor, function
 
 from keras.datasets import mnist
@@ -22,9 +24,9 @@ from ntm import NeuralTuringMachine as NTM
 
 from IPython import display
 
-batch_size = 100
+batch_size = 123
 
-h_dim = 64
+h_dim = 34
 n_slots = 50
 m_length = 20
 input_dim = 8
@@ -35,8 +37,9 @@ clipnorm = 10
 
 
 def gen_model():
-    KB.clear_session()
+    #KB.clear_session()
     model = Sequential()
+    model.name = "NTM"
     ntm = NTM(2*h_dim, n_slots=n_slots, m_length=m_length, shift_range=3,
               inner_rnn='lstm',
               return_sequences=True,
@@ -44,9 +47,13 @@ def gen_model():
               batch_size = batch_size
               )
     model.add(ntm)
-    import pudb; pu.db
-    model.add(TimeDistributed(Dense(units=input_dim)))
+    #import pudb; pu.db
+    model.add(TimeDistributed(Dense(units=input_dim), input_shape=(123,35,8)))
     model.add(Activation('sigmoid'))
 
     sgd = Adam(lr=lr, clipnorm=clipnorm)
     model.compile(loss='binary_crossentropy', optimizer=sgd, sample_weight_mode="temporal")
+
+    return model, batch_size
+
+

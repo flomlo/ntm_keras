@@ -32,14 +32,14 @@ def _update_controller(self, inp, h_tm1, M):
     if len(h_tm1) in [1,2]:
         if hasattr(self.rnn,"get_constants"):
             BW,BU = self.rnn.get_constants(x)
-            print(BW)
-            print(BU)
             h_tm1 += (BW,BU)
     # update state
     _, h = self.rnn.step(self.rnn.preprocess_input(x), h_tm1)
 #   this is one step in the right direction should the LSTM work with
 #   implementation=0; but so far doesnt work (BUG?)
 #    _, h = self.rnn.step(self.rnn.preprocess_input(K.repeat(x,1)), h_tm1)
+
+#    import pudb; pu.db
 
     return h
 
@@ -73,8 +73,6 @@ def _renorm(x):
 
 def _softmax(x):
     # that is probably not even useful anymore. what did it do?
-    print("were @ softmax, x is:")
-    print(x)
     wt = K.batch_flatten(x)
     w = K.softmax(wt)
     return w.reshape(x.shape)  # T.clip(s, 0, 1)
@@ -108,12 +106,11 @@ class NeuralTuringMachine(Recurrent):
 
     """
     def __init__(self, output_dim, n_slots, m_length, shift_range=3,
-                 inner_rnn='lstm',
-#                 init='glorot_uniform',
-#                 inner_init='orthogonal',      Default values anyway
-                 return_sequences=True,
-                 #input_shape=(None, 8),
-                 **kwargs):
+                        inner_rnn='lstm',
+                        batch_size=777,                 
+#                       init='glorot_uniform',
+#                       inner_init='orthogonal',      Default values anyway
+                        **kwargs):
         super(NeuralTuringMachine, self).__init__(**kwargs)
         self.output_dim = output_dim
         self.units = output_dim
@@ -121,6 +118,7 @@ class NeuralTuringMachine(Recurrent):
         self.m_length = m_length
         self.shift_range = shift_range
         self.inner_rnn = inner_rnn
+        self.batch_size = batch_size
         
         # WARNING: Not understood, only copied from keras/recurrent.py
         # In our case the dimension seems to be 5 (LSTM) or 4 (GRU),
@@ -170,8 +168,6 @@ class NeuralTuringMachine(Recurrent):
 
         # initial memory, state, read and write vectors
         #
-        #self.M = theano.shared((.001*np.ones((1,)).astype(floatX)))
-        # thats the old version using Theano. Im not sure if the following is equivalent ...
         self.M = K.variable(value=(.001*np.ones((1,))), name="main_memory")
         self.init_h = K.zeros(shape=(1,self.output_dim), name="state_vector")
         self.init_wr = K.variable(np.ones(self.n_slots)/self.n_slots, name="read_vector")
@@ -242,19 +238,10 @@ class NeuralTuringMachine(Recurrent):
     # See chapter 3.3.1
     def _get_content_w(self, beta, k, M):
         num = beta[:, None] * _cosine_distance(M, k)
-        print("We're @ _get_content_w, num is:")
-        print(num)
         return K.softmax(num) #it was _softmax before, but that does the same?
 
     # This is as described in chapter 3.2.2
     def _get_location_w(self, g, s, C, gamma, wc, w_tm1):
-        print("We're @ _get_location. The input (g, s, C, gamma, wc, w_tm1) is:")
-        print(g)
-        print(s)
-        print(C)
-        print(gamma)
-        print(wc)
-        print(w_tm1)
         # Equation 7:
         wg = (g[:, None] * wc) + (1-g[:, None])*w_tm1
         # Cs is the circular convolution
@@ -285,7 +272,7 @@ class NeuralTuringMachine(Recurrent):
 #        init_M = init_M.flatten(ndim=2)  
         
         #FIXME: Why is the memory flattened at all, only to be unflattened later?
-        init_M = K.variable((K.ones((batch_size, self.n_slots * self.m_length)))*0.001)
+        init_M = K.ones((batch_size, self.n_slots * self.m_length))*0.001
 #       # the bonkers code from above, in case its actually necessary (metadata)        
 #        init_M = K.batch_flatten(K.repeat(K.repeat(K.repeat(K.FIXME ,
 #                                                            batch_size, axis=0),
@@ -296,10 +283,6 @@ class NeuralTuringMachine(Recurrent):
         init_ww = K.ones((batch_size, self.n_slots), name="init_wr")/self.n_slots
         if self.inner_rnn == 'lstm':
             init_c = K.repeat_elements(self.init_c, batch_size, axis=0)
-            print("init_c, self.init_c is:")
-            print(init_c)
-            print(self.init_c)
-
             return [init_M, K.softmax(init_wr), K.softmax(init_ww), init_h, init_c] #the softmax here confuses me.
         else:
             return [init_M, K.softmax(init_wr), K.softmax(init_ww), init_h]
@@ -368,9 +351,8 @@ class NeuralTuringMachine(Recurrent):
 #        return None
 
     def step(self, inputs, states):
-        print("We're @ step. input resp. states is:")
-        print(inputs)
-        print(states)
+        #import pudb; pu.db
+
 
         M_tm1, wr_tm1, ww_tm1 = states[:3]
         # reshape
@@ -397,7 +379,9 @@ class NeuralTuringMachine(Recurrent):
         wc_write = self._get_content_w(beta_write, k_write, M_tm1)
         ww_t = self._get_location_w(g_write, s_write, self.C, gamma_write,
                                     wc_write, ww_tm1)
+        # erase
         e = K.sigmoid(K.dot(h_t[0], self.W_e) + self.b_e)
+        # add
         a = K.tanh(K.dot(h_t[0], self.W_a) + self.b_a)
         M_t = self._write(ww_t, e, a, M_tm1)
 
