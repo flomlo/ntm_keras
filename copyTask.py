@@ -32,7 +32,7 @@ def get_sample(batch_size=128, n_bits=8, max_size=20, min_size=1):
 
 def test_model(model, file_name=None, min_size=40, batch_size=128):
     I, V, sw = get_sample(batch_size=batch_size, n_bits=input_dim, max_size=min_size+1, min_size=min_size)
-    Y = np.asarray(model.predict(I, batch_size=batch_size) > .5).astype('float64')
+    Y = np.asarray(model.predict(I, batch_size=batch_size, verbose=True) > .5).astype('float64')
     acc = (V[:, -min_size:, :] == Y[:, -min_size:, :]).mean() * 100
     #show_pattern(Y[0], V[0], sw[0], file_name)
     return acc

@@ -4,7 +4,7 @@ from keras.layers import LSTM, Activation, Dense
 from keras.layers.wrappers import TimeDistributed
 from keras.optimizers import Adam
 
-batch_size = 128
+batch_size = 123
 h_dim = 64
 n_slots = 50
 m_length = 20
@@ -28,4 +28,4 @@ def gen_model():
     sgd = Adam(lr=lr, clipnorm=clipnorm)
     model_LSTM.compile(loss='binary_crossentropy', optimizer=sgd)
 
-    return model_LSTM
+    return model_LSTM, batch_size

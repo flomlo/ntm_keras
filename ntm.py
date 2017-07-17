@@ -39,7 +39,6 @@ def _update_controller(self, inp, h_tm1, M):
 #   implementation=0; but so far doesnt work (BUG?)
 #    _, h = self.rnn.step(self.rnn.preprocess_input(K.repeat(x,1)), h_tm1)
 
-#    import pudb; pu.db
 
     return h
 
@@ -123,11 +122,11 @@ class NeuralTuringMachine(Recurrent):
         # WARNING: Not understood, only copied from keras/recurrent.py
         # In our case the dimension seems to be 5 (LSTM) or 4 (GRU),
         # see get_initial_states
-        self.state_spec = [InputSpec(shape=(None, self.units)),
-                            InputSpec(shape=(None, self.units)),
-                            InputSpec(shape=(None, self.units)),
-                            InputSpec(shape=(None, self.units)),
-                            InputSpec(shape=(None, self.units))]
+        self.state_spec = [InputSpec(shape=(None, self.n_slots * m_length)),         # Memory
+                            InputSpec(shape=(None, self.n_slots)),                   # init_wr
+                            InputSpec(shape=(None, self.n_slots)),                   # init_ww
+                            InputSpec(shape=(None, self.output_dim)),                # init_h
+                            InputSpec(shape=(None, self.output_dim))]                # init_c (LSTM only)
 
 
     def build(self, input_shape):
@@ -167,60 +166,106 @@ class NeuralTuringMachine(Recurrent):
         self.states = [None, None, None, None, None]
 
         # initial memory, state, read and write vectors
-        #
-        # flat memory
-        self.M = K.variable(value=(.001*np.ones((1, self.n_slots * self.m_length))), name="main_memory")
-#       # alternativly, 2d-memory
-#        self.M = K.variable(value=(.001*np.ones((1, self.n_slots, self.m_length))), name="main_memory")
-        self.init_h = K.zeros(shape=(1, self.output_dim), name="state_vector")
-        self.init_wr = K.variable(np.ones((1, self.n_slots))/self.n_slots, name="read_vector")
-        self.init_ww = K.variable(np.ones((1, self.n_slots))/self.n_slots, name="write_vector")
+        # FIXME: Do they belong here or not?
+        #self.M = self.add_weight(shape=(1, self.n_slots , self.m_length),
+        #                            name = "main_memory",
+        #                            initializer = 'zeros',
+        #                            trainable = False)
+
+#        self.init_h = K.zeros(shape=(1, self.output_dim), name="state_vector")
+#        self.init_wr = K.variable(np.ones((1, self.n_slots))/self.n_slots, name="read_vector")
+#        self.init_ww = K.variable(np.ones((1, self.n_slots))/self.n_slots, name="write_vector")
 
         # write: erase, then add.
-        self.W_e = self.rnn.kernel_initializer((self.output_dim, self.m_length))  # erase
-        self.b_e = K.zeros((1,self.m_length), name="write_erase_bias")
-        self.W_a = self.rnn.kernel_initializer((self.output_dim, self.m_length))  # add
-        self.b_a = K.zeros((1,self.m_length), name="write_add_bias")
+        # erase
+        self.W_e = self.add_weight(shape = (self.output_dim, self.m_length),
+                                    name = "erase_vektor_weights",
+                                    initializer = self.rnn.kernel_initializer,
+                                    trainable = True)
+        self.b_e = self.add_weight(shape = (1,self.m_length),
+                                    name="erase_vector_bias",
+                                    initializer = 'zero',
+                                    trainable = True)
+
+        # add
+        self.W_a = self.add_weight(shape = (self.output_dim, self.m_length),
+                                    name = "add_vector_weights",
+                                    initializer = self.rnn.kernel_initializer,
+                                    trainable = True)
+        self.b_a = self.add_weight(shape = (1,self.m_length),
+                                    name="add_vector_bias",
+                                    initializer = 'zero',
+                                    trainable = True)
 
         #
         # get_w  parameters for reading operation
         #
         # key vector
-        self.W_k_read = self.rnn.kernel_initializer((self.output_dim, self.m_length))
-        self.b_k_read = self.rnn.bias_initializer((1, self.m_length))
+        self.W_k_read = self.add_weight(shape = (self.output_dim, self.m_length),
+                                    name = "read_key_vector_weights",
+                                    initializer = self.rnn.kernel_initializer,
+                                    trainable = True)
+        self.b_k_read = self.add_weight(shape = (1,self.m_length),
+                                    name="read_key_vector_bias",
+                                    initializer = self.rnn.bias_initializer,
+                                    trainable = True)
+
         # 3 continuos(!) parameters, beta, g, gamme, as referenced in Figure 2 respectivly
         # equations 5, 7, 9
-        self.W_c_read = self.rnn.kernel_initializer((self.output_dim, 3))
-        self.b_c_read = self.rnn.bias_initializer((1,3))
+        self.W_c_read = self.add_weight(shape = (self.output_dim, 3),
+                                    name = "read_beta_g_gamma_weights",
+                                    initializer = self.rnn.kernel_initializer,
+                                    trainable = True)
+        self.b_c_read = self.add_weight(shape = (1,3),
+                                    name="read_beta_g_gamma_bias",
+                                    initializer = self.rnn.bias_initializer,
+                                    trainable = True)
         # shift 
-        self.W_s_read = self.rnn.kernel_initializer((self.output_dim, self.shift_range))
-        self.b_s_read = self.rnn.bias_initializer((1,self.shift_range)) 
+        self.W_s_read = self.add_weight(shape = (self.output_dim, self.shift_range),
+                                    name = "read_shift_vector_weights",
+                                    initializer = self.rnn.kernel_initializer,
+                                    trainable = True)
+        self.b_s_read = self.add_weight(shape = (1,3),
+                                    name = "read_shift_vector_bias",
+                                    initializer = self.rnn.bias_initializer,
+                                    trainable = True)
 
         #
         # get_w  parameters for writing operation
         #
         # key vector
-        self.W_k_write = self.rnn.kernel_initializer((self.output_dim, self.m_length))
-        self.b_k_write = self.rnn.bias_initializer((1, self.m_length))
+        self.W_k_write = self.add_weight(shape = (self.output_dim, self.m_length),
+                                    name = "write_key_vector_weights",
+                                    initializer = self.rnn.kernel_initializer,
+                                    trainable = True)
+        self.b_k_write = self.add_weight(shape = (1,self.m_length),
+                                    name="write_key_vector_bias",
+                                    initializer = self.rnn.bias_initializer,
+                                    trainable = True)
+
         # 3 continuos(!) parameters, beta, g, gamme, as referenced in Figure 2 respectivly
         # equations 5, 7, 9
-        self.W_c_write = self.rnn.kernel_initializer((self.output_dim, 3))
-        self.b_c_write = self.rnn.bias_initializer((1,3))
+        self.W_c_write = self.add_weight(shape = (self.output_dim, 3),
+                                    name = "write_beta_g_gamma_weights",
+                                    initializer = self.rnn.kernel_initializer,
+                                    trainable = True)
+        self.b_c_write = self.add_weight(shape = (1,3),
+                                    name="write_beta_g_gamma_bias",
+                                    initializer = self.rnn.bias_initializer,
+                                    trainable = True)
         # shift 
-        self.W_s_write = self.rnn.kernel_initializer((self.output_dim, self.shift_range))
-        self.b_s_write = self.rnn.bias_initializer((1,self.shift_range))
+        self.W_s_write = self.add_weight(shape = (self.output_dim, self.shift_range),
+                                    name = "write_shift_vector_weights",
+                                    initializer = self.rnn.kernel_initializer,
+                                    trainable = True)
+        self.b_s_write = self.add_weight(shape = (1,3),
+                                    name = "write_shift_vector_bias",
+                                    initializer = self.rnn.bias_initializer,
+                                    trainable = True)
 
         self.C = _circulant(self.n_slots, self.shift_range)
 
-        self.trainable_weights = self.rnn.trainable_weights + [
-            self.W_e, self.b_e,
-            self.W_a, self.b_a,
-            self.W_k_read, self.b_k_read,
-            self.W_c_read, self.b_c_read,
-            self.W_s_read, self.b_s_read,
-            self.W_k_write, self.b_k_write,
-            self.W_s_write, self.b_s_write,
-            self.W_c_write, self.b_c_write,]
+        self.trainable_weights += self.rnn.trainable_weights 
 #            self.M,
 #            self.init_h, self.init_wr, self.init_ww]
 
@@ -258,6 +303,7 @@ class NeuralTuringMachine(Recurrent):
         wout = _renorm(wtilda ** gamma[:, None])
         return wout
 
+    # See Figure 2, here we get controller outputs
     def _get_controller_output(self, h, W_k, b_k, W_c, b_c, W_s, b_s):
         k = K.tanh(K.dot(h, W_k) + b_k)  # + 1e-6
         c = K.dot(h, W_c) + b_c
@@ -269,24 +315,19 @@ class NeuralTuringMachine(Recurrent):
 
     def get_initial_state(self, X):
         batch_size = K.int_shape(X)[0]
-        import pudb; pu.db
-        #FIXME! 
+        #FIXME! make batchsize variable 
         batch_size = self.batch_size
-#       # only commented the following out because its so hillariously bonkers.
+#       # only commented the previous version because its so hillariously bonkers.
 #        init_M = self.M.dimshuffle(0, 'x', 'x').repeat(
 #            batch_size, axis=0).repeat(self.n_slots, axis=1).repeat(
 #            self.m_length, axis=2)        
 #        init_M = init_M.flatten(ndim=2)  
         
         #FIXME: Why is the memory flattened at all, only to be unflattened later?
-        init_M = K.ones((batch_size, self.n_slots * self.m_length))*0.001
-        #init_M = K.repeat(self.M, 
-#       # the bonkers code from above, in case its actually necessary (metadata)        
-#        init_M = K.batch_flatten(K.repeat(K.repeat(K.repeat(K.FIXME ,
-#                                                            batch_size, axis=0),
-#                                                            self.n_slots, axis=1),
-#                                                            self.m_length, axis=2))
-        init_h = K.variable(np.zeros((batch_size, self.output_dim)), name="init_h")
+#        init_M = K.ones((batch_size, self.n_slots , self.m_length))*0.001
+#        init_M = K.ones((batch_size, self.n_slots * self.m_length))*0.001
+#        init_M = K.ones((batch_size, self.n_slots , self.m_length))*0.001
+        init_h = K.ones((batch_size, self.output_dim), name="init_h")*0.2
         init_wr = K.ones((batch_size, self.n_slots), name="init_wr")/self.n_slots
         init_ww = K.ones((batch_size, self.n_slots), name="init_wr")/self.n_slots
         if self.inner_rnn == 'lstm':
@@ -344,30 +385,17 @@ class NeuralTuringMachine(Recurrent):
                             masking=masking)
         return states
 
-#    def call(self, input):
-        # split input
-
-        # read from memory by the instructions given in the last step
-
-        # let the controller do its work
-
-        # write to memory
-
-        # give the new read instructions
-
-        # return 
-#        return None
 
     def step(self, inputs, states):
-        #import pudb; pu.db
-
-
         M_tm1, wr_tm1, ww_tm1 = states[:3]
         # reshape
         #FIXME! how do we get the batchsize here?
         # self.batch_size is a temporary solution
+        # addendum: might not be necessary if memory saved properly, now has right shape automatically 
+        #
         M_tm1 = K.reshape(M_tm1,(self.batch_size, self.n_slots, self.m_length))
         # read
+        import pudb; pu.db
         h_tm1 = states[3:]
         k_read, beta_read, g_read, gamma_read, s_read = self._get_controller_output(
             h_tm1[0], self.W_k_read, self.b_k_read, self.W_c_read, self.b_c_read,
