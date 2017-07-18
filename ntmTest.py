@@ -40,7 +40,7 @@ def gen_model():
     #KB.clear_session()
     model = Sequential()
     model.name = "NTM"
-    ntm = NTM(2*h_dim, n_slots=n_slots, m_length=m_length, shift_range=3,
+    ntm = NTM(h_dim, n_slots=n_slots, m_length=m_length, shift_range=3,
               inner_rnn='lstm',
               return_sequences=True,
               input_shape=(None, input_dim), 

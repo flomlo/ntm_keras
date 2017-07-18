@@ -1,8 +1,44 @@
-import numpy as np
+# History of this code:
+# This is all based on ntm.py found in the seya-repository of EderSantana, 
+# https://github.com/EderSantana/seya/blob/master/seya/layers/ntm.py
+# as (git clone)'d on 2017-07-12 or something like that.
+#
+# Problem: the code was written for keras 0.12 (?), and relied heavily on Theano as the backend.
+#
+# This code was then reworked by me, and by reworking I mean: cluelessly debugging, trying to understand what it does,
+# even looking up ancient keras documentation in the wayback machine (*cries*), rewriting all that to something which seems
+# like the semantic equivalence in Keras 2, Backend neutral code.
+# That would have gone quicker if I've either understood Keras, Theno, Python debugging or what the NTM even does.
+#
+# After that, and hours of debugging numerical features due to wrong initialization of vectors it then finally worked.
+# By working I mean: All the actual interaction with the memory was completly broken. Just didnt work, behaved like a
+# layer consisting solely like a LSTM (which makes quite a lot of sense)
+#
+# After a few days it dawned me that quite a lot of the topological descriptions were utter failures. Maybe I interpreted
+# the original code wrong, or there were even bigger changes in the API than I ever understood. 
+# 
+# After that I rewrote almost everything that was left. The only thing semantically original are the helper functions
+# which do *exactly* what is described in the NTM-Paper, and the _circulant function, which is actually quite nice!
+# 
+# But all in all, I really want to thank EderSantana. It was a shitload of work, but without his code to work on, and
+# inproving in small steps until I really understood what I was doing, I would have never tried anyway.
+#
+# Also the overall idea of understanding the NTM as a recurrent layer to be used inside another model (and not solely as
+# model by itself, not embeddable at all), which was his, might turn out to be visionary.
+# Lets see.
 
-import theano
-import theano.tensor as T
-floatX = theano.config.floatX
+# Oh, before I forget: In the end, I consider copyright to this code with exception to _circulant, considering the other
+# helper functions as prior art (which was in the NTM paper), to lie with me.
+#
+# If I understand correctly, the perfect License for "leave me alone I dont care" would be BSD 3 (which is the same for
+# EderSantanas original code, just in doubt).
+#
+# Therefore, this code is licensed by BSD v3.
+#
+
+
+
+import numpy as np
 
 from keras.layers.recurrent import Recurrent, GRU, LSTM
 from keras.initializers import Orthogonal, Zeros
@@ -10,17 +46,6 @@ from keras import backend as K
 from keras.engine.topology import InputSpec 
 
 from utils import rnn_states
-
-
-
-
-tol = 1e-4
-
-
-def _wta(X):
-    M = K.max(X, axis=-1, keepdims=True)
-    R = K.switch(K.equal(X, M), X, 0.)
-    return R
 
 
 def _update_controller(self, inp, h_tm1, M):
@@ -44,6 +69,12 @@ def _update_controller(self, inp, h_tm1, M):
 
 
 def _circulant(leng, n_shifts):
+    # This is more or less the only code still left from the original author,
+    # EderSantan @ Github.
+    # It works perfectly and is elegant! So grats to him.
+    # My implementation would probably just be worse.
+    # Below his original comment:
+ 
     """
     I confess, I'm actually proud of this hack. I hope you enjoy!
     This will generate a tensor with `n_shifts` of rotated versions the
@@ -70,13 +101,6 @@ def _renorm(x):
     return x / (K.sum(x, axis=1, keepdims=True))
 
 
-def _softmax(x):
-    # that is probably not even useful anymore. what did it do?
-    wt = K.batch_flatten(x)
-    w = K.softmax(wt)
-    return w.reshape(x.shape)  # T.clip(s, 0, 1)
-
-
 def _cosine_distance(M, k):
     # this is equation (6)
     # TODO: Is this the best way to implement it? 
@@ -100,15 +124,12 @@ class NeuralTuringMachine(Recurrent):
 
     Known issues:
     -------------
-    Theano may complain when n_slots == 1.
     Currently batch_input_size is necessary. Or not? Im not even sure :(
 
     """
     def __init__(self, output_dim, n_slots, m_length, shift_range=3,
                         inner_rnn='lstm',
                         batch_size=777,                 
-#                       init='glorot_uniform',
-#                       inner_init='orthogonal',      Default values anyway
                         **kwargs):
         super(NeuralTuringMachine, self).__init__(**kwargs)
         self.output_dim = output_dim
@@ -118,22 +139,53 @@ class NeuralTuringMachine(Recurrent):
         self.shift_range = shift_range
         self.inner_rnn = inner_rnn
         self.batch_size = batch_size
+        # Calculate the controller output dimension, consisting of:
+        #       the regular output dimension (output_dim)
+        #
+        # plus for every read head the addressing data (for details, see figure 2):
+        #       key_vector (m_length) 
+        #       beta (1)
+        #       g (1)
+        #       shift_vector (shift_range)
+        #       gamma (1)
+        self.controller_read_head_emitting_dim =
+                m_length + 1 + 1 + shift_range + 1
+        # But what do for write heads? The adressing_data_dim is the same, but we emit additionally:
+        #
+        #       erase_vector (m_length)
+        #       add_vector (m_length)
+        self.controller_write_head_emitting_dim =
+                self.controller_read_head_emitting_dim +
+                2 * m_length
+        # So this results in:
+        # TODO: arbitrary number of write/read heads
+        self.controller_output_dim = self.output_dim + 
+                self.controller_read_head_emitting_dim +
+                self.controller_write_head_emitting_dim
+
+        # For the input shape of the controller the formula is a bit easier:
+        #       the regular input_dim (output_dim)
+        # plus, for every read head:
+        #       read_vector (m_length).
+        # So that results in:
+        # TODO: arbitrary number of read heads
+        self.controller_input_dim = 
+                self.input_dim +
+                m_length
+
         
-        # WARNING: Not understood, only copied from keras/recurrent.py
-        # In our case the dimension seems to be 5 (LSTM) or 4 (GRU),
-        # see get_initial_states
+        # WARNING: Only poorly understood, only copied from keras/recurrent.py
+        # In our case the dimension seems to be 5 (LSTM) or 4 (GRU / FeedForward),
+        # see self.get_initial_states()
         self.state_spec = [InputSpec(shape=(None, self.n_slots * m_length)),         # Memory
                             InputSpec(shape=(None, self.n_slots)),                   # init_wr
                             InputSpec(shape=(None, self.n_slots)),                   # init_ww
-                            InputSpec(shape=(None, self.output_dim)),                # init_h
+                            InputSpec(shape=(None, self.output_dim)),                # init_h TODO: WTF is this actually?
                             InputSpec(shape=(None, self.output_dim))]                # init_c (LSTM only)
 
 
     def build(self, input_shape):
-        print("here comes the input shape")
-        print(input_shape)
         bs, input_length, input_dim = input_shape
-        #self.input = T.tensor3()
 
         if self.inner_rnn == 'gru':
             raise ValueError('this inner_rnn is not implemented yet. But it should be minor work, adjusting some initial state and stuff. try it yourself!')
@@ -145,129 +197,24 @@ class NeuralTuringMachine(Recurrent):
                 inner_init=self.inner_init)
         elif self.inner_rnn == 'lstm':
             self.rnn = LSTM(
-                output_dim = self.output_dim,
+                units= self.controller_output_dim,
                 implementation = 2,     # implemenation 0 seems to be a bit buggy regarding step function behavior
-#                units = self.output_dim,
-                input_shape = (bs, input_length, input_dim + self.m_length),
-                #kernel_initializer=self.init,
-                #inner_init=self.inner_init)
-                #unit_forget_bias_init='zero'
-                )
+                input_shape = (bs, input_length, self.controller_input_dim))
         else:
+            # TODO: FeedForward Network (Just a dense layer) would be a must-have feature.
+            # FEATURE REQUEST: However, handling a whole Keras *model* would be incredible cool.
             raise ValueError('this inner_rnn is not implemented yet.')
 
 #        self.rnn.build(input_shape)
         self.rnn.build(input_shape=(bs, input_length, input_dim + self.m_length))
 
-        # WARNING: Not understood, only copied from keras/recurrent.py
+        # WARNING: Only poorly understood, only copied from keras/recurrent.py
         # In our case the dimension seems to be 5 (LSTM) or 4 (GRU),
         # see get_initial_states, those respond to:
         # init_M, init_wr, init_ww, init_h, init_c (LSTM only)
         self.states = [None, None, None, None, None]
 
-        # initial memory, state, read and write vectors
-        # FIXME: Do they belong here or not?
-        #self.M = self.add_weight(shape=(1, self.n_slots , self.m_length),
-        #                            name = "main_memory",
-        #                            initializer = 'zeros',
-        #                            trainable = False)
-
-#        self.init_h = K.zeros(shape=(1, self.output_dim), name="state_vector")
-#        self.init_wr = K.variable(np.ones((1, self.n_slots))/self.n_slots, name="read_vector")
-#        self.init_ww = K.variable(np.ones((1, self.n_slots))/self.n_slots, name="write_vector")
-
-        # write: erase, then add.
-        # erase
-        self.W_e = self.add_weight(shape = (self.output_dim, self.m_length),
-                                    name = "erase_vektor_weights",
-                                    initializer = self.rnn.kernel_initializer,
-                                    trainable = True)
-        self.b_e = self.add_weight(shape = (1,self.m_length),
-                                    name="erase_vector_bias",
-                                    initializer = 'zero',
-                                    trainable = True)
-
-        # add
-        self.W_a = self.add_weight(shape = (self.output_dim, self.m_length),
-                                    name = "add_vector_weights",
-                                    initializer = self.rnn.kernel_initializer,
-                                    trainable = True)
-        self.b_a = self.add_weight(shape = (1,self.m_length),
-                                    name="add_vector_bias",
-                                    initializer = 'zero',
-                                    trainable = True)
-
-        #
-        # get_w  parameters for reading operation
-        #
-        # key vector
-        self.W_k_read = self.add_weight(shape = (self.output_dim, self.m_length),
-                                    name = "read_key_vector_weights",
-                                    initializer = self.rnn.kernel_initializer,
-                                    trainable = True)
-        self.b_k_read = self.add_weight(shape = (1,self.m_length),
-                                    name="read_key_vector_bias",
-                                    initializer = self.rnn.bias_initializer,
-                                    trainable = True)
-
-        # 3 continuos(!) parameters, beta, g, gamme, as referenced in Figure 2 respectivly
-        # equations 5, 7, 9
-        self.W_c_read = self.add_weight(shape = (self.output_dim, 3),
-                                    name = "read_beta_g_gamma_weights",
-                                    initializer = self.rnn.kernel_initializer,
-                                    trainable = True)
-        self.b_c_read = self.add_weight(shape = (1,3),
-                                    name="read_beta_g_gamma_bias",
-                                    initializer = self.rnn.bias_initializer,
-                                    trainable = True)
-        # shift 
-        self.W_s_read = self.add_weight(shape = (self.output_dim, self.shift_range),
-                                    name = "read_shift_vector_weights",
-                                    initializer = self.rnn.kernel_initializer,
-                                    trainable = True)
-        self.b_s_read = self.add_weight(shape = (1,3),
-                                    name = "read_shift_vector_bias",
-                                    initializer = self.rnn.bias_initializer,
-                                    trainable = True)
-
-        #
-        # get_w  parameters for writing operation
-        #
-        # key vector
-        self.W_k_write = self.add_weight(shape = (self.output_dim, self.m_length),
-                                    name = "write_key_vector_weights",
-                                    initializer = self.rnn.kernel_initializer,
-                                    trainable = True)
-        self.b_k_write = self.add_weight(shape = (1,self.m_length),
-                                    name="write_key_vector_bias",
-                                    initializer = self.rnn.bias_initializer,
-                                    trainable = True)
-
-        # 3 continuos(!) parameters, beta, g, gamme, as referenced in Figure 2 respectivly
-        # equations 5, 7, 9
-        self.W_c_write = self.add_weight(shape = (self.output_dim, 3),
-                                    name = "write_beta_g_gamma_weights",
-                                    initializer = self.rnn.kernel_initializer,
-                                    trainable = True)
-        self.b_c_write = self.add_weight(shape = (1,3),
-                                    name="write_beta_g_gamma_bias",
-                                    initializer = self.rnn.bias_initializer,
-                                    trainable = True)
-        # shift 
-        self.W_s_write = self.add_weight(shape = (self.output_dim, self.shift_range),
-                                    name = "write_shift_vector_weights",
-                                    initializer = self.rnn.kernel_initializer,
-                                    trainable = True)
-        self.b_s_write = self.add_weight(shape = (1,3),
-                                    name = "write_shift_vector_bias",
-                                    initializer = self.rnn.bias_initializer,
-                                    trainable = True)
-
-        self.C = _circulant(self.n_slots, self.shift_range)
-
         self.trainable_weights += self.rnn.trainable_weights 
-#            self.M,
-#            self.init_h, self.init_wr, self.init_ww]
 
         if self.inner_rnn == 'lstm':
             self.init_c = K.zeros((1,self.output_dim), name="init_controller")
@@ -275,66 +222,57 @@ class NeuralTuringMachine(Recurrent):
 
         super(NeuralTuringMachine, self).build(input_shape)
 
-    def _read(self, w, M):
-        return K.sum((w[:, :, None]*M),axis=1)
-
-    # See chapter 3.2
-    def _write(self, w, e, a, M):
-        # see equation (3)
-        Mtilda = M * (1 - w[:, :, None]*e[:, None, :])
-        # see equation (4)
-        Mout = Mtilda + w[:, :, None]*a[:, None, :]
-        return Mout
-
-    # See chapter 3.3.1
-    def _get_content_w(self, beta, k, M):
-        num = beta[:, None] * _cosine_distance(M, k)
-        return K.softmax(num) #it was _softmax before, but that does the same?
-
-    # This is as described in chapter 3.2.2
-    def _get_location_w(self, g, s, C, gamma, wc, w_tm1):
-        # Equation 7:
-        wg = (g[:, None] * wc) + (1-g[:, None])*w_tm1
-        # Cs is the circular convolution
-        Cs = K.sum((C[None, :, :, :] * wg[:, None, None, :]),axis=3)
-        # Equation 8:
-        wtilda = K.sum((Cs * s[:, :, None]),axis=1)
-        # Equation 9:
-        wout = _renorm(wtilda ** gamma[:, None])
-        return wout
-
-    # See Figure 2, here we get controller outputs
-    def _get_controller_output(self, h, W_k, b_k, W_c, b_c, W_s, b_s):
-        k = K.tanh(K.dot(h, W_k) + b_k)  # + 1e-6
-        c = K.dot(h, W_c) + b_c
-        beta = K.relu(c[:, 0]) + 1e-4
-        g = K.sigmoid(c[:, 1])
-        gamma = K.relu(c[:, 2]) + 1.0001
-        s = K.softmax(K.dot(h, W_s) + b_s)
-        return k, beta, g, gamma, s
 
     def get_initial_state(self, X):
         batch_size = K.int_shape(X)[0]
-        #FIXME! make batchsize variable 
+        #FIXME! make batchsize variable, not fixed with model 
         batch_size = self.batch_size
-#       # only commented the previous version because its so hillariously bonkers.
+#       #   only commented the previous version because its so hillariously bonkers:
 #        init_M = self.M.dimshuffle(0, 'x', 'x').repeat(
 #            batch_size, axis=0).repeat(self.n_slots, axis=1).repeat(
 #            self.m_length, axis=2)        
 #        init_M = init_M.flatten(ndim=2)  
         
         #FIXME: Why is the memory flattened at all, only to be unflattened later?
-#        init_M = K.ones((batch_size, self.n_slots , self.m_length))*0.001
-#        init_M = K.ones((batch_size, self.n_slots * self.m_length))*0.001
-#        init_M = K.ones((batch_size, self.n_slots , self.m_length))*0.001
-        init_h = K.ones((batch_size, self.output_dim), name="init_h")*0.2
+        init_M = K.ones((batch_size, self.n_slots * self.m_length))*0.001
         init_wr = K.ones((batch_size, self.n_slots), name="init_wr")/self.n_slots
         init_ww = K.ones((batch_size, self.n_slots), name="init_wr")/self.n_slots
         if self.inner_rnn == 'lstm':
             init_c = K.repeat_elements(self.init_c, batch_size, axis=0)
-            return [init_M, K.softmax(init_wr), K.softmax(init_ww), init_h, init_c] #the softmax here confuses me.
+            return [init_M, K.softmax(init_wr), K.softmax(init_ww), init_c] #the softmax here confuses me.
         else:
-            return [init_M, K.softmax(init_wr), K.softmax(init_ww), init_h]
+            return [init_M, K.softmax(init_wr), K.softmax(init_ww)]
+
+
+
+    # See chapter 3.1
+    def _read(self, weights, M):
+        return K.sum((weights[:, :, None]*M),axis=1)
+
+    # See chapter 3.2
+    def _write(self, weights, e, a, M):
+        # see equation (3)
+        M_tilda = M * (1 - w[:, :, None]*e[:, None, :])
+        # see equation (4)
+        Mout = M_tilda + w[:, :, None]*a[:, None, :]
+        return Mout
+
+    # This is the chain described in Figure 2, or in further detail by
+    # Chapter 3.3.1 (content based) and Chapter 3.3.2 (location based)
+    def _get_weight_vector(self, w_tm1, M, k, beta, g, s, C, gamma, wc):
+        # Content adressing, see Chapter 3.3.1:
+        num = beta[:, None] * _cosine_distance(M, k)
+        w_c K.softmax(num) 
+        # Location adressing, see Chapter 3.3.2:
+        # Equation 7:
+        w_g = (g[:, None] * wc) + (1-g[:, None])*w_tm1
+        # Cs is the circular convolution
+        C_s = K.sum((C[None, :, :, :] * wg[:, None, None, :]),axis=3)
+        # Equation 8:
+        w_tilda = K.sum((Cs * s[:, :, None]),axis=1)
+        # Equation 9:
+        wout = _renorm(wtilda ** gamma[:, None])
+        return wout
 
     @property
     def output_shape(self):
@@ -344,83 +282,83 @@ class NeuralTuringMachine(Recurrent):
         else:
             return input_shape[0], self.output_dim
 
-    def get_full_output(self, train=False):
-        """
-        This method is for research and visualization purposes. Use it as
-        X = model.get_input()  # full model
-        Y = ntm.get_output()    # this layer
-        F = theano.function([X], Y, allow_input_downcast=True)
-        [memory, read_address, write_address, rnn_state] = F(x)
-
-        if inner_rnn == "lstm" use it as
-        [memory, read_address, write_address, rnn_cell, rnn_state] = F(x)
-
-        """
-        # input shape: (nb_samples, time (padded with zeros), input_dim)
-        X = self.get_input(train)
-        assert K.ndim(X) == 3
-        if K._BACKEND == 'tensorflow':
-            if not self.input_shape[1]:
-                raise Exception('When using TensorFlow, you should define ' +
-                                'explicitely the number of timesteps of ' +
-                                'your sequences. Make sure the first layer ' +
-                                'has a "batch_input_shape" argument ' +
-                                'including the samples axis.')
-
-        mask = self.get_output_mask(train)
-        if mask:
-            # apply mask
-            X *= K.cast(K.expand_dims(mask), X.dtype)
-            masking = True
-        else:
-            masking = False
-
-        if self.stateful:
-            initial_states = self.states
-        else:
-            initial_states = self.get_initial_states(X)
-
-        states = rnn_states(self.step, X, initial_states,
-                            go_backwards=self.go_backwards,
-                            masking=masking)
-        return states
-
 
     def step(self, inputs, states):
-        M_tm1, wr_tm1, ww_tm1 = states[:3]
+        # TODO: decide what to do if there is no controller state
+        if self.inner_rnn = 'lstm':
+            M_tm1, w_read_tm1, w_write_tm1, controller_state = states
+        else:
+            ValueError("sorry, not implemented yet")
+
         # reshape
         #FIXME! how do we get the batchsize here?
         # self.batch_size is a temporary solution
         # addendum: might not be necessary if memory saved properly, now has right shape automatically 
-        #
         M_tm1 = K.reshape(M_tm1,(self.batch_size, self.n_slots, self.m_length))
-        # read
-        import pudb; pu.db
-        h_tm1 = states[3:]
-        k_read, beta_read, g_read, gamma_read, s_read = self._get_controller_output(
-            h_tm1[0], self.W_k_read, self.b_k_read, self.W_c_read, self.b_c_read,
-            self.W_s_read, self.b_s_read)
-        wc_read = self._get_content_w(beta_read, k_read, M_tm1)
-        wr_t = self._get_location_w(g_read, s_read, self.C, gamma_read,
-                                    wc_read, wr_tm1)
-        M_read = self._read(wr_t, M_tm1)
 
-        # update controller
-        h_t = _update_controller(self, inputs, h_tm1, M_read)
+        # read: 
+        # We have the Memory M_tm1 (t minus one / t-1), and a read weighting w_read_tm1 calculated in the last
+        # step. This is enough to calculate the read_vector we feed into the controller:
+        read_vector = self._read(wr_tm1, M_tm1)
 
-        # write
-        k_write, beta_write, g_write, gamma_write, s_write = self._get_controller_output(
-            h_t[0], self.W_k_write, self.b_k_write, self.W_c_write,
-            self.b_c_write, self.W_s_write, self.b_s_write)
-        wc_write = self._get_content_w(beta_write, k_write, M_tm1)
-        ww_t = self._get_location_w(g_write, s_write, self.C, gamma_write,
-                                    wc_write, ww_tm1)
-        # erase
-        e = K.sigmoid(K.dot(h_t[0], self.W_e) + self.b_e)
-        # add
-        a = K.tanh(K.dot(h_t[0], self.W_a) + self.b_a)
-        M_t = self._write(ww_t, e, a, M_tm1)
+        # Now feed the controller and let it run a single step, implemented by calling the step function directly,
+        # which we have to provide with the actual input from outside, the information we've read an the states which
+        # are relevant to the controller.
+        # TODO make description more precise
+        controller_output, controller_state = _run_controller_step(self, inputs, read_vector, controller_state)
 
-        M_t = K.batch_flatten(M_t)
+        # Now we split the controller output into actual output, read head adressing, write head adressing, etc.
+        # TODO: make more precise
+        # We now carefully split the gigantic output of the controller into rough chunks:
+        # As a reminder, it is split up like that:
+        # output_dim + controller_read_emitting_dim + controller_write_emitting_dim
+        # TODO: Multiple heads
+        # TODO: Im not very prout of that code. Not at all. Please improve it or help me improving it :(
+        # TODO: At least put it into a separate function.
 
-        return h_t[0], [M_t, wr_t, ww_t] + h_t
+        ntm_output = controller_output[:self.output_dim]
+        
+        controller_read_emitted_data   = controller_output[self.output_dim : (self.output_dim +
+                                                                                    self.controller_read_emitting_dim)]
+        controller_write_emitted_data  = controller_output[-self.controller_write_emitting_dim :]
+        
+        # Now for fine grained output
+        # The further naming follows the naming of the NTM-Paper, but we note if its for reading or writing: 
+
+        k_read         = controller_read_emitted_data[: m_length] 
+        beta_read      = controller_read_emitted_data[m_length : m_length + 1] 
+        g_read         = controller_read_emitted_data[m_length + 1: m_length + 1 + 1] 
+        shift_read     = controller_read_emitted_data[m_length + 1 + 1 : shift_range]
+        gamma_read     = controller_read_emitted_data[-1 : ]
+
+        k_write        = controller_write_emitted_data[: m_length] 
+        beta_write     = controller_write_emitted_data[m_length : m_length + 1] 
+        g_write        = controller_write_emitted_data[m_length + 1: m_length + 1 + 1] 
+        shift_write    = controller_write_emitted_data[m_length + 1 + 1 : shift_range]
+        gamma_write    = controller_write_emitted_data[m_length + 1 + 1 + shift_range : - 2*m_length]
+        erase_vector   = controller_write_emitted_data[-2*m_length : -m_length]
+        add_vector     = controller_write_emitted_data[-m_length : ]
+
+        # In hindsight I now understand why DeepMind build Sonnet. It should be much easier and cleaner in there.
+
+        
+        # Now we want to write to the memory.
+        # But first, we have to calculate the adress we send the erase and add vektor to:
+        # As seen in Figure 2 of the Paper, this depends on a lot of variables:
+        w_write = _get_weight_vector (self, w_write_tm1, M_tm1, k_write, beta_write, g_write, shift_write, gamma_write)
+
+        # But now we can manipulate it, using old Memory, the w_write adress vector, erase and add vector:
+        M = _write_to_memory(M_tm1, w_write, erase_vector, add_vector)
+
+        # Only one thing left until this step is complete: Calculate the read weights we save in the state and use next
+        # round:
+        w_read = _get_weight_vector (self, w_read_tm1, M, k_read, beta_read, g_read, shift_read, gamma_read)
+
+        # Now lets pack up the state in a list and call it a day.
+        return ntm_output, [M, w_read, w_write, controller_state]
+
+
+
+
+
+# PS: As always: Dont forget to bind your AIs energy supply to the condition of you being still alive.
