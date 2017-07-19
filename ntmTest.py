@@ -44,8 +44,7 @@ def gen_model():
               inner_rnn='lstm',
               return_sequences=True,
               input_shape=(None, input_dim), 
-              batch_size = batch_size
-              )
+              batch_size = batch_size)
     model.add(ntm)
     #import pudb; pu.db
     model.add(TimeDistributed(Dense(units=input_dim), input_shape=(123,35,8)))
