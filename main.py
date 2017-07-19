@@ -6,5 +6,5 @@ plot_model(model_NTM, to_file='graphs/model_NTM.png', show_shapes = True)
 
 from copyTask import lengthy_test
 
-lengthy_test(model_NTM, batch_size=batch_size, training_epochs=1000)
+lengthy_test(model_NTM, batch_size=batch_size, training_epochs=500)
 import pudb; pu.db

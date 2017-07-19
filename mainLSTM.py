@@ -8,5 +8,5 @@ plot_model(model_LSTM, to_file='graphs/model_LSTM.png', show_shapes = True)
 
 from copyTask import lengthy_test
 
-lengthy_test(model_LSTM, batch_size=batch_size, training_epochs=100)
+lengthy_test(model_LSTM, batch_size=batch_size, training_epochs=1000)
 import pudb; pu.db

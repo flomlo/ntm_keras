@@ -27,25 +27,25 @@
 # model by itself, not embeddable at all), which was his, might turn out to be visionary. Lets see.
 
 # Oh, before I forget: In the end, I consider copyright to this code with exception to _circulant, considering the other
-# helper functions as prior art (which was in the NTM paper), to lie with me.
+# helper functions as prior art (which was in the NTM paper), to lay with me. As far as copyright for some
+# implementation for some idea found in some paper can lay in anybodies hands.
 #
 # If I understand correctly, the perfect License for "leave me alone I dont care" would be BSD 3 (which is the same for
 # EderSantanas original code, just in doubt).
 #
-# Therefore, this code is licensed by BSD v3.
+# Therefore, this code is licensed under BSD v3.
 #
 
 
 
 import numpy as np
 
+import keras
 from keras.layers.recurrent import Recurrent, GRU, LSTM
-from keras.initializers import Orthogonal, Zeros
+from keras.layers.core import Dense
+#from keras.initializers import RandomNormal, Orthogonal, Zeros
 from keras import backend as K
 from keras.engine.topology import InputSpec 
-
-from utils import rnn_states
-
 
 def _circulant(leng, n_shifts):
     # This is more or less the only code still left from the original author,
@@ -83,8 +83,8 @@ def _renorm(x):
 def _cosine_distance(M, k):
     # this is equation (6)
     # TODO: Is this the best way to implement it? 
-    # Can it be found in a library?
-    # TODO: probably besser conditioned if we first normalize and then do the scalar product
+    # Can it be found in a library? Maybe via the cosine loss of keras?
+    # TODO: probably besser conditioned if we first normalize and then do the scalar product.
     dot = K.sum((K.batch_dot(M, k)),axis=-1)
     nM = K.sqrt(K.sum((M**2), axis=-1))
     nk = K.sqrt(K.sum((k**2), axis=-1, keepdims=True))
@@ -107,7 +107,7 @@ class NeuralTuringMachine(Recurrent):
 
     """
     def __init__(self, output_dim, n_slots, m_length, shift_range=3,
-                        inner_rnn='lstm',
+                        controller_architecture='dense',
                         batch_size=777,                 
 #                        input_shape = (None, 8), 
                         **kwargs):
@@ -117,7 +117,7 @@ class NeuralTuringMachine(Recurrent):
         self.n_slots = n_slots
         self.m_length = m_length
         self.shift_range = shift_range
-        self.inner_rnn = inner_rnn
+        self.controller_architecture = controller_architecture
         self.batch_size = batch_size
         # For calculating the controller output dimension, we need the output_dim of the whole layer
         # (which is only passed during building) plus all the stuff we need to interact with the memory,
@@ -156,54 +156,58 @@ class NeuralTuringMachine(Recurrent):
         # So that results in:
         # TODO: arbitrary number of read heads
         self.controller_input_dim = input_dim + self.m_length
+        
 
-        if self.inner_rnn == 'gru':
-            raise ValueError('this inner_rnn is not implemented yet. But it should be minor work, adjusting some initial state and stuff. try it yourself!')
-            self.rnn = GRU(
+        # Now that we've calculated the shape of the controller, we have add it to the layer/model.
+        if self.controller_architecture == 'gru':
+            raise ValueError('This controller_architecture is not implemented yet. But it should be minor work, adjusting some initial state and stuff. try it yourself!')
+            self.controller = GRU(
                 activation='relu',
                 input_dim=input_dim+self.m_length,
                 input_length=input_leng,
                 output_dim=self.output_dim, init=self.init,
                 inner_init=self.inner_init)
-        elif self.inner_rnn == 'lstm':
-            self.rnn = LSTM(
+        elif self.controller_architecture == 'lstm':
+            self.controller = LSTM(
                 units= self.controller_output_dim,
+                activation='linear',
                 implementation = 2,     # implemenation 0 seems to be a bit buggy regarding step function behavior
+                bias_initializer = keras.initializers.Constant(-5), #FIXME
+                input_shape = (bs, input_length, self.controller_input_dim))
+        elif self.controller_architecture is 'dense':
+            self.controller = Dense(
+                units = self.controller_output_dim,
+                activation = 'linear',
+                bias_initializer = keras.initializers.Constant(0.5), #FIXME
                 input_shape = (bs, input_length, self.controller_input_dim))
         else:
-            # TODO: FeedForward Network (Just a dense layer) would be a must-have feature.
-            # FEATURE REQUEST: However, handling a whole Keras *model* would be incredible cool.
-            raise ValueError('this inner_rnn is not implemented yet.')
+            # FEATURE REQUEST: Handling a whole Keras *model* as controller would be so incredible cool.
+            raise ValueError('this controller_architecture is not implemented yet.')
 
-        self.rnn.build(input_shape=(bs, input_length, input_dim + self.m_length))
+        self.controller.build(input_shape=(bs, input_length, input_dim + self.m_length))
 
         self.C = _circulant(self.n_slots, self.shift_range)
 
-        # In our case the dimension seems to be 4 (LSTM) or 3 (GRU/FF),
-        # see get_initial_states, those respond to:
-        # init_M, init_wr, init_ww, init_h] + [(init_c] (LSTM only))
-        if self.inner_rnn is 'lstm':
-            self.states = [None, None, None, None, None]
-        else:
-            raise ValueError('sorry, broken')
-            self.states = [None, None, None, None]
-
-        self.trainable_weights += self.rnn.trainable_weights 
-
-        if self.inner_rnn == 'lstm':
-            #FIXME this could be initialized better. also, why trainable?
-            self.init_c = K.ones((1,self.controller_output_dim), name="init_controller")*0.5
-            #self.trainable_weights = self.trainable_weights + [self.init_c, ]
+        self.trainable_weights += self.controller.trainable_weights 
 
 
-        # WARNING: Only poorly understood, only copied from keras/recurrent.py
-        # In our case the dimension seems to be 5 (LSTM) or 4 (GRU / FeedForward),
-        # see self.get_initial_states()
+        # We need to declare the number of states we want to carry around.
+        # In our case the dimension seems to be 5 (LSTM) or 4 (GRU) or 3 (FF),
+        # see self.get_initial_states, those respond to:
+        # [init_M, init_wr, init_ww] +  [init_h] (LSMT and GRU) + [(init_c] (LSTM only))
+        # WARNING: self.state_spec does is only poorly understood,
+        # only copied from keras/recurrent.py.
+        self.states = [None, None, None]
         self.state_spec = [InputSpec(shape=(None, self.n_slots * self.m_length)),               # Memory
                             InputSpec(shape=(None, self.n_slots)),                              # init_wr
-                            InputSpec(shape=(None, self.n_slots)),                              # init_ww
-                            InputSpec(shape=(None, self.controller_output_dim)),                # init_h (LSTM only)
-                            InputSpec(shape=(None, self.controller_output_dim))]                # init_c (LSTM only)
+                            InputSpec(shape=(None, self.n_slots))]                              # init_ww
+        if self.controller_architecture is 'GRU': 
+            self.states += [None]
+            self.state_spec += [InputSpec(shape=(None, self.controller_output_dim))]            # init_h (GRUS/LSTM)
+        if self.controller_architecture is 'lstm':
+            self.states += [None, None]
+            self.state_spec += [InputSpec(shape=(None, self.controller_output_dim))]            # init_h (GRUS/LSTM)
+            self.state_spec += [InputSpec(shape=(None, self.controller_output_dim))]            # init_c (LSTM only)
 
         super(NeuralTuringMachine, self).build(input_shape)
 
@@ -213,16 +217,23 @@ class NeuralTuringMachine(Recurrent):
         #FIXME! make batchsize variable, not fixed with model 
         batch_size = self.batch_size
         
-        init_M = K.ones((batch_size, self.n_slots , self.m_length))*0.001
-        init_wr = K.ones((batch_size, self.n_slots), name="init_wr")/self.n_slots
-        init_ww = K.ones((batch_size, self.n_slots), name="init_wr")/self.n_slots
-        init_h = K.ones((batch_size, self.controller_output_dimself.init_c))*0.1
-
-        if self.inner_rnn == 'lstm':
-            init_c = K.ones((batch_size, self.controller_output_dimself.init_c))*0.1
-            return [init_M, K.softmax(init_wr), K.softmax(init_ww), init_h, init_c] #the softmax here confuses me.
-        else:
+        init_M = K.ones((batch_size, self.n_slots , self.m_length), name='main_memory')*0.005
+        init_wr = K.ones((batch_size, self.n_slots), name="weigths_read")/self.n_slots
+        init_ww = K.ones((batch_size, self.n_slots), name="weights_write")/self.n_slots
+        
+        if self.controller_architecture is 'dense':   # actually: stateless
             return [init_M, K.softmax(init_wr), K.softmax(init_ww)]
+        else:
+            init_h = K.ones((batch_size, self.controller_output_dim), name="init_h")*0.5
+            if self.controller_architecture is 'GRU':
+                raise ValueError('not implemented yet')
+                return [init_M, init_wr, init_ww, init_h]
+            elif self.controller_architecture is "lstm":
+                init_c = K.ones((batch_size, self.controller_output_dim), name="init_c")*0.5
+                return [init_M, init_wr, init_ww, init_h, init_c]
+            else:
+                raise ValueError('not implemented yet')
+
 
 
 
@@ -260,16 +271,18 @@ class NeuralTuringMachine(Recurrent):
         # FIXME: Could we spare ourself the hassle by setting the LSTM statefullness to True?
         #Warning: This is highly sensitive to the implementation of the LSTM, which could change. For example, it
         #        already breaks if we implementation 0 instead of implementation 2.
-        controller = self.rnn
+        controller = self.controller
         controller_input = K.concatenate([inputs, read_vector])
         # begin magic: (inspired by EderSantana)
         # TODO: I'm quite sure this could be done less implementation-sensitive.
         # TODO: Some If statements for other controllers
-        if len(controller_state) in [1,2]:
+        if len(controller_state) in [1,2]: #LSTM or GRU
             if hasattr(controller, "get_constants"):
                 BW,BU = controller.get_constants(controller_input)
                 controller_state += (BW,BU)
-        controller_output, controller_state = controller.step(controller_input, controller_state)
+                controller_output, controller_state = controller.step(controller_input, controller_state)
+        else: # dense
+            controller_output = controller.call(controller_input)
         return controller_output, controller_state
 
 
@@ -287,11 +300,10 @@ class NeuralTuringMachine(Recurrent):
     def step(self, inputs, states):
         # TODO: decide what to do if there is no controller state
         M_tm1, w_read_tm1, w_write_tm1 = states[:3]
-        controller_states = states[3:] #this could be empty (FF), length 1 (GRU) or length 2 (LSTM)
+        controller_states = list(states[3:]) #this could be empty (FF), length 1 (GRU) or length 2 (LSTM)
         
 
 
-        # read: 
         # We have the Memory M_tm1 (t minus one / t-1), and a read weighting w_read_tm1 calculated in the last
         # step. This is enough to calculate the read_vector we feed into the controller:
         read_vector = self._read(w_read_tm1, M_tm1)

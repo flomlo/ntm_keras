@@ -32,7 +32,10 @@ def get_sample(batch_size=128, n_bits=8, max_size=20, min_size=1):
 
 def test_model(model, file_name=None, min_size=40, batch_size=128):
     I, V, sw = get_sample(batch_size=batch_size, n_bits=input_dim, max_size=min_size+1, min_size=min_size)
-    Y = np.asarray(model.predict(I, batch_size=batch_size, verbose=True) > .5).astype('float64')
+    Y = np.asarray(model.predict(I, batch_size=batch_size) > .5).astype('float64')
+    print("evalating model")
+    print(model.evaluate(I,V, batch_size=batch_size, verbose=0))
+    import pudb; pu.db
     acc = (V[:, -min_size:, :] == Y[:, -min_size:, :]).mean() * 100
     #show_pattern(Y[0], V[0], sw[0], file_name)
     return acc
@@ -47,7 +50,8 @@ def lengthy_test(model, testrange=[5,10,20,40,80], training_epochs=512, batch_si
     log_path = LOG_PATH_BASE + ts + "_-_" + model.name 
     tb = keras.callbacks.TensorBoard(log_dir=log_path, write_graph=True)
     
-    callbacks = [tb, keras.callbacks.TerminateOnNaN()]
+    callbacks = [tb]#, keras.callbacks.TerminateOnNaN()]
+
     for i in testrange:
         acc = test_model(model, min_size=i, batch_size=batch_size)
         print("the accuracy for length {0} was: {1}%%".format(i,acc))
@@ -55,6 +59,7 @@ def lengthy_test(model, testrange=[5,10,20,40,80], training_epochs=512, batch_si
     train_model(model, epochs=training_epochs, batch_size=batch_size, callbacks=callbacks)
     print("training complete, now testing again") 
     for i in testrange:
+        import pudb; pu.db
         acc = test_model(model, min_size=i, batch_size=batch_size)
         print("the accuracy for length {0} was: {1}%%".format(i,acc))
     return
