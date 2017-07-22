@@ -1,0 +1,38 @@
+This code tries to implement the Neural Turing Machine, as found in 
+https://arxiv.org/abs/1410.5401, as a backend neutral recurrent keras layer.
+
+
+
+NOTE:
+- For debugging purposes, the backend is currently restricted to tensorflow, but it should work for everyone by
+commenting out those line which rely on it (its really only debug).
+- You may want to change the LOGDIR_BASE in main.py to something that works for you.
+- The implementation with LSTM-controller is currently highly sensitive to the implementation of the LSTM-layer in keras
+  itself. therefore, it may break occasionally.
+
+
+
+
+
+For a quick start, type 
+
+python main.py
+
+while in a python enviroment which has tensorflow, keras, numpy. tensorflow-gpu is recommend, as everything is about 10x
+faster.
+
+This builds a NTM with *one* dense layer of appropriate size, tries it on the copyTask for length 5,10,20,40,80 and then
+trains it on 1 Million samples (1000 epochs of each 1000 freshly generated samples length between 5 and 20, adjust that in main.py), which takes about 3h on a GTX
+1050Ti. 
+
+For me that resulted in 50% accuracy (seen bitwise) before training, and 80%, 75%, 73%, 64%, 50% after training. Which
+is success, but not huge success.
+
+You may compare that with 3 layers of LSTMs:
+
+python mainLSTM.py
+
+This builds 3 layers of LSTM with size 256 each (see Table 3 of the paper) and goes through the same testing procedure
+as above, which for me resulted in 50% (before trainig), a training time of approximately 20 minutes (same GPU) and 
+60, 
+

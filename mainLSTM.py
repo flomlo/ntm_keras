@@ -1,12 +1,17 @@
-from keras.utils import plot_model
-
 import model_lstm
 
-model_LSTM, batch_size = model_lstm.gen_model()
+from testing_utils import lengthy_test
 
-plot_model(model_LSTM, to_file='graphs/model_LSTM.png', show_shapes = True)
+output_dim = 8
+input_dim = output_dim+2
+batch_size=100
+testrange=[5,10,20,40,80]
+epochs=1000
 
-from copyTask import lengthy_test
 
-lengthy_test(model_LSTM, batch_size=batch_size, training_epochs=1000)
+model_LSTM = model_lstm.gen_model(input_dim=input_dim, output_dim=output_dim, batch_size=batch_size)
+
+lengthy_test(model_LSTM, epochs=epochs)
+
+
 import pudb; pu.db

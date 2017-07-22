@@ -1,30 +1,28 @@
 import keras
 from keras.models import Sequential
-from keras.layers import LSTM, Activation, Dense
-from keras.layers.wrappers import TimeDistributed
+from keras.layers import LSTM, Activation
 from keras.optimizers import Adam
 
 batch_size = 123
-n_slots = 50
-m_length = 20
-input_dim = 8
-output_dim = input_dim
-lr = 1e-3
+lr = 5e-4
 clipnorm = 10
+units = 256
 
-input_shape = (None, input_dim)
 
 
-def gen_model():
+def gen_model(input_dim=10, output_dim=8, batch_size=100):
     model_LSTM = Sequential()
     model_LSTM.name = "LSTM"
-    model_LSTM.add(LSTM(input_shape=input_shape, units=output_dim, return_sequences=True))
-    model_LSTM.add(LSTM(units=h_dim*2, return_sequences=True))
-    model_LSTM.add(LSTM(units=h_dim*2, return_sequences=True))
+    model_LSTM.batch_size = batch_size
+    model_LSTM.input_dim = input_dim
+    model_LSTM.output_dim = output_dim
+
+    model_LSTM.add(LSTM(input_shape=(None, input_dim), units=units, return_sequences=True))
+    model_LSTM.add(LSTM(units=units, return_sequences=True))
+    model_LSTM.add(LSTM(units=output_dim, return_sequences=True))
     model_LSTM.add(Activation('sigmoid'))
 
-
     sgd = Adam(lr=lr, clipnorm=clipnorm)
-    model_LSTM.compile(loss='binary_crossentropy', optimizer=sgd)
+    model_LSTM.compile(loss='binary_crossentropy', optimizer=sgd, metrics = ['binary_accuracy'], sample_weight_mode="temporal")
 
-    return model_LSTM, batch_size
+    return model_LSTM

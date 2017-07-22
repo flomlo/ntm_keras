@@ -282,9 +282,9 @@ class NeuralTuringMachine(Recurrent):
         # Equation 9:
         w_out = _renorm(w_tilda ** gamma)
 
-        w_out = tf.Print(w_out, [w_tm1[0], M[0], k[0], beta[0], s[0], gamma[0]], message="_get_weight_vectors inputs: w_tm1, M, k, beta, s, gamma ")
-        w_out = tf.Print(w_out, [num[0], w_c[0], w_g[0], C_s[0], w_tilda[0], w_out[0]], message="_get_weight_vectors calculations:num, w_c,  w_g, C_s, w_tilda, w_out ")
-        w_out = tf.Print(w_out, [K.sum(w_c[0], axis=-1), K.sum(w_g[0], axis=-1), K.sum(w_tilda[0], axis=-1), K.sum(w_out[0], axis=-1)], message="_get_weight_vectors sum calculations: If all one, all is good. ")
+        #w_out = tf.Print(w_out, [w_tm1[0], M[0], k[0], beta[0], s[0], gamma[0]], message="_get_weight_vectors inputs: w_tm1, M, k, beta, s, gamma ")
+        #w_out = tf.Print(w_out, [num[0], w_c[0], w_g[0], C_s[0], w_tilda[0], w_out[0]], message="_get_weight_vectors calculations:num, w_c,  w_g, C_s, w_tilda, w_out ")
+        #w_out = tf.Print(w_out, [K.sum(w_c[0], axis=-1), K.sum(w_g[0], axis=-1), K.sum(w_tilda[0], axis=-1), K.sum(w_out[0], axis=-1)], message="_get_weight_vectors sum calculations: If all one, all is good. ")
         
         lowerBoundAlert = tf.assert_non_negative(w_out, message="weights vector had value < 0")
         upperBoundAlert = tf.assert_non_positive(w_out - 1, message="weights vector had value > 1")
@@ -413,11 +413,3 @@ class NeuralTuringMachine(Recurrent):
         return ntm_output, [ntm_output] + [M, w_read, w_write] + controller_states
 
 
-
-
-
-
-
-
-
-# PS: As always: Dont forget to bind your AIs energy supply to the condition of you being still alive.
