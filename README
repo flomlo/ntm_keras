@@ -4,10 +4,10 @@ https://arxiv.org/abs/1410.5401, as a backend neutral recurrent keras layer.
 
 
 NOTE:
-- For debugging purposes, the backend is currently restricted to tensorflow, but it should work for every backend by
+* For debugging purposes, the backend is currently restricted to tensorflow, but it should work for every backend by
 commenting out those line which rely on it (its really only debug, and tensorboard).
-- You may want to change the LOGDIR_BASE in testing_utils.py to something that works for you.
-- The implementation with LSTM-controller is currently highly sensitive to the implementation of the LSTM-layer in keras
+* You may want to change the LOGDIR_BASE in testing_utils.py to something that works for you.
+* The implementation with LSTM-controller is currently highly sensitive to the implementation of the LSTM-layer in keras
   itself. Therefore, it may break occasionally with keras updates.
 
 
@@ -16,7 +16,7 @@ commenting out those line which rely on it (its really only debug, and tensorboa
 
 For a quick start, type 
 
-python main.py ntm
+    python main.py ntm
 
 while in a python enviroment which has tensorflow, keras, numpy. tensorflow-gpu is recommend, as everything is about 10x
 faster.
@@ -31,9 +31,9 @@ is success, but not huge success.
 
 
 Why is it success? Compare it with just the controller alone, i.e a 1x8 dense layer in temporal wrapping:
-This can be tested via 
+This can be tested via:
 
-python main.py dense
+    python main.py dense 
 
 And results in TODO
 
@@ -43,7 +43,7 @@ And results in TODO
 But why not huge success? Well, besides the obvious fact that even 80% on length 5 is not at all great,
 You may compare that with 3 layers of LSTMs:
 
-python main.py lstm
+    python main.py lstm
 
 This builds 3 layers of LSTM with size 256 each (see Table 3 of the paper) and goes through the same testing procedure
 as above, which for me resulted in 50% (before trainig), a training time of approximately 1h minutes (same GPU) and 
