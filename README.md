@@ -46,6 +46,6 @@ You may compare that with 3 layers of LSTMs:
     python main.py lstm
 
 This builds 3 layers of LSTM with size 256 each (see Table 3 of the paper) and goes through the same testing procedure
-as above, which for me resulted in 50% (before trainig), a training time of approximately 1h minutes (same GPU) and 
+as above, which for me resulted in 50% (before trainig), a training time of approximately 1h (same GPU) and 
 (roughly) 100%, 100%, 94%, 50%, 50% accuracy at the respective test lengths. 
 
