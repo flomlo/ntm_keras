@@ -82,7 +82,7 @@ def _renorm(x):
 
 def _cosine_distance(M, k):
     # this is equation (6), or as I like to call it: The NaN factory.
-    # TODO: Find it in a library (cosine loss?)
+    # TODO: Find it in a library (keras cosine loss?)
     nk = K.l2_normalize(k, axis=-1)
     nM = K.l2_normalize(M, axis=-1)
     cosine_distance = K.batch_dot(nM, nk)
@@ -169,6 +169,7 @@ class NeuralTuringMachine(Recurrent):
             self.controller = LSTM(
                 name = "controller",
                 units= self.controller_output_dim,
+                activation = 'sigmoid'
                 implementation = 2,     # implemenation 0 seems to be a bit buggy regarding step function behavior
                 input_shape = (bs, input_length, self.controller_input_dim))
         elif self.controller_architecture is 'dense':

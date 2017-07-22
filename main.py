@@ -7,13 +7,14 @@ output_dim = 8
 input_dim = output_dim + 2  # this is the actual input dim of the network, that includes two dims for flags
 batch_size = 100
 #testrange=[5,10,20,40,80,160]
-epochs=10
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument("modelType", help="the kind of model you want to test, either ntm, dense or lstm")
+parser.add_argument("--epochs", help="the number of epochs to train", default="1000", type=int)
 args = parser.parse_args()
 modelType = args.modelType
+epochs = args.epochs
 
 
 if modelType == 'lstm':

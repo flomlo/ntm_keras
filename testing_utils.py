@@ -42,7 +42,7 @@ def train_model(model, epochs=10, min_size=5, max_size=20, callbacks=None):
 
 
 def lengthy_test(model, testrange=[5,10,20,40,80], epochs=100):
-    ts =datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+    ts = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
     log_path = LOG_PATH_BASE + ts + "_-_" + model.name 
     tb = keras.callbacks.TensorBoard(log_dir=log_path, write_graph=True)
     callbacks = [tb, keras.callbacks.TerminateOnNaN()]
