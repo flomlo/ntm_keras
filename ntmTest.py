@@ -1,27 +1,21 @@
-
-import logging
 import numpy as np
 
-from copyTask import lengthy_test
-
 from keras.layers.core import Activation
+from keras.layers.wrappers import TimeDistributed
 from keras.models import Sequential
-from keras.optimizers import Adam, SGD
+from keras.optimizers import Adam
 from keras import backend as K
+import keras
 
 from ntm import NeuralTuringMachine as NTM
 
 
-batch_size = 1
-
-output_dim = 8
-n_slots = 50
+n_slots = 128
 m_length = 20
-input_dim = 8
-lr = 1e-3
+learning_rate = 5e-4
 clipnorm = 10
 
-def gen_model():
+def gen_model(input_dim, batch_size, output_dim):
     model = Sequential()
     model.name = "NTM"
     ntm = NTM(output_dim, n_slots=n_slots, m_length=m_length, shift_range=3,
@@ -30,11 +24,10 @@ def gen_model():
               input_shape=(None, input_dim), 
               batch_size = batch_size)
     model.add(ntm)
-    model.add(Activation('linear'))
+    #model.add(Activation('sigmoid'))
 
-    sgd = Adam(lr=lr) #, clipnorm=clipnorm)
-    model.compile(loss='mean_absolute_error', optimizer=sgd, metrics = ['accuracy'], sample_weight_mode="temporal")
-#    model.compile(loss='binary_crossentropy', optimizer=sgd, metrics = ['accuracy'], sample_weight_mode="temporal")
+    sgd = Adam(lr=learning_rate, clipnorm=clipnorm)
+    model.compile(loss='binary_crossentropy', optimizer=sgd, metrics = ['binary_accuracy'], sample_weight_mode="temporal")
 
     return model, batch_size
 
