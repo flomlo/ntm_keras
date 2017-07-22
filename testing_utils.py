@@ -34,15 +34,10 @@ def train_model(model, epochs=10, min_size=5, max_size=20, callbacks=None):
     output_dim = model.output_dim
     batch_size = model.batch_size
 
-    import pudb; pu.db
     sample_generator = get_sample(batch_size=batch_size, in_bits=input_dim, out_bits=output_dim,
                                                 max_size=max_size, min_size=min_size)
-    model.fit_generator(sample_generator, 1, epochs=epochs, callbacks=callbacks)
+    model.fit_generator(sample_generator, 10, epochs=epochs, callbacks=callbacks)
 
-    #for i in range(epochs): 
-    #    I, V, sw = get_sample(batch_size=batch_size, in_bits=input_dim, out_bits=output_dim,
-    #                                    max_size=max_size, min_size=min_size)
-    #    model.fit(I, V, sample_weight=sw, callbacks=callbacks, epochs=i+1, batch_size=batch_size, initial_epoch=i)
     print("done training")
 
 
