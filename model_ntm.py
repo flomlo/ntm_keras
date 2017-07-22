@@ -23,7 +23,7 @@ def gen_model(input_dim, batch_size, output_dim):
     model.output_dim = output_dim
 
     ntm = NTM(output_dim, n_slots=n_slots, m_length=m_length, shift_range=3,
-              controller_architecture='dense',
+              controller_architecture='lstm',
               return_sequences=True,
               input_shape=(None, input_dim), 
               batch_size = batch_size)

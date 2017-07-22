@@ -108,6 +108,7 @@ class NeuralTuringMachine(Recurrent):
     def __init__(self, output_dim, n_slots, m_length, shift_range=3,
                         controller_architecture='dense',
                         batch_size=777,                 
+                        stateful=False,
 #                        input_shape = (None, 8), 
                         **kwargs):
         self.output_dim = output_dim
@@ -118,6 +119,7 @@ class NeuralTuringMachine(Recurrent):
         self.controller_architecture = controller_architecture
         self.batch_size = batch_size
         self.return_sequence = True
+        self.stateful = stateful
         # For calculating the controller output dimension, we need the output_dim of the whole layer
         # (which is only passed during building) plus all the stuff we need to interact with the memory,
         # calculated here:
@@ -165,13 +167,17 @@ class NeuralTuringMachine(Recurrent):
                 name = "controller"
                 #TODO
                 )
+
         elif self.controller_architecture == 'lstm':
             self.controller = LSTM(
                 name = "controller",
                 units= self.controller_output_dim,
-                activation = 'sigmoid'
-                implementation = 2,     # implemenation 0 seems to be a bit buggy regarding step function behavior
+                stateful = True,
+                batch_size = self.batch_size,
+                activation = 'sigmoid',
+                implementation = 2,     # best for gpu. other ones also might not work.
                 input_shape = (bs, input_length, self.controller_input_dim))
+
         elif self.controller_architecture is 'dense':
             self.controller = Dense(
                 name = "controller",
@@ -179,11 +185,12 @@ class NeuralTuringMachine(Recurrent):
                 bias_initializer = 'zeros',
                 units = self.controller_output_dim,
                 input_shape = (bs, input_length, self.controller_input_dim))
+
         else:
             # FEATURE REQUEST: Handling a whole Keras *model* as controller would be so incredible cool.
             raise ValueError('this controller_architecture is not implemented yet.')
 
-        self.controller.build(input_shape=(bs, input_length, input_dim + self.m_length))
+        self.controller.build(input_shape=(self.batch_size, input_length, input_dim + self.m_length))
 
         self.C = _circulant(self.n_slots, self.shift_range)
 
@@ -209,44 +216,27 @@ class NeuralTuringMachine(Recurrent):
                             InputSpec(shape=(None, self.n_slots)),                              # init_wr
                             InputSpec(shape=(None, self.n_slots))]                              # init_ww
 
-        if self.controller_architecture in ['GRU', 'lstm']: 
-            self.states += [None]
-            self.state_spec += [InputSpec(shape=(None, self.controller_output_dim))]            # init_h (GRUS/LSTM)
-        if self.controller_architecture is 'lstm':
-            self.states += [None]
-            self.state_spec += [InputSpec(shape=(None, self.controller_output_dim))]            # init_c (LSTM only)
-
         super(NeuralTuringMachine, self).build(input_shape)
 
 
     def get_initial_state(self, X):
-        batch_size = K.int_shape(X)[0]
         #FIXME! make batchsize variable, not fixed with model 
-        batch_size = self.batch_size
-        
 
-        init_old_ntm_output = K.ones((batch_size, self.output_dim), name="init_old_ntm_output")*0.42 # never used.
+        if not self.stateful:
+            self.controller.reset_states()
+
+        init_old_ntm_output = K.ones((self.batch_size, self.output_dim), name="init_old_ntm_output")*0.42 # never used.
         #init_M = K.ones((batch_size, self.n_slots , self.m_length), name='main_memory')*self.m_length**-0.5
         init_M = self.M
-        init_wr = np.zeros((batch_size, self.n_slots))
+        init_wr = np.zeros((self.batch_size, self.n_slots))
         init_wr[:,0] = 1    # turns out that uniform initialisation is almost perfectly unperfect.
         init_wr = K.variable(init_wr, name="init_weights_read")
-        init_ww = np.zeros((batch_size, self.n_slots))
+        init_ww = np.zeros((self.batch_size, self.n_slots))
         init_ww[:,0] = 1
         init_ww = K.variable(init_ww, name="init_weights_write")
         
-        if self.controller_architecture is 'dense':   # actually: stateless
-            return [init_old_ntm_output, init_M, init_wr, init_ww]
-        else:
-            init_h = K.ones((batch_size, self.controller_output_dim), name="init_h")*0.5
-            if self.controller_architecture is 'GRU':
-                raise ValueError('not implemented yet')
-                return [init_old_ntm_output, init_M, init_wr, init_ww, init_h]
-            elif self.controller_architecture is "lstm":
-                init_c = K.ones((batch_size, self.controller_output_dim), name="init_c")*0.5
-                return [init_old_ntm_output, init_M, init_wr, init_ww, init_h, init_c]
-            else:
-                raise ValueError('not implemented yet')
+
+        return [init_old_ntm_output, init_M, init_wr, init_ww]
 
 
 
@@ -283,34 +273,24 @@ class NeuralTuringMachine(Recurrent):
         # Equation 9:
         w_out = _renorm(w_tilda ** gamma)
 
-        #w_out = tf.Print(w_out, [w_tm1[0], M[0], k[0], beta[0], s[0], gamma[0]], message="_get_weight_vectors inputs: w_tm1, M, k, beta, s, gamma ")
-        #w_out = tf.Print(w_out, [num[0], w_c[0], w_g[0], C_s[0], w_tilda[0], w_out[0]], message="_get_weight_vectors calculations:num, w_c,  w_g, C_s, w_tilda, w_out ")
-        #w_out = tf.Print(w_out, [K.sum(w_c[0], axis=-1), K.sum(w_g[0], axis=-1), K.sum(w_tilda[0], axis=-1), K.sum(w_out[0], axis=-1)], message="_get_weight_vectors sum calculations: If all one, all is good. ")
+        w_out = tf.Print(w_out, [w_tm1[0], M[0], k[0], beta[0], s[0], gamma[0]], message="_get_weight_vectors inputs: w_tm1, M, k, beta, s, gamma ")
+        w_out = tf.Print(w_out, [num[0], w_c[0], w_g[0], C_s[0], w_tilda[0], w_out[0]], message="_get_weight_vectors calculations:num, w_c,  w_g, C_s, w_tilda, w_out ")
+        w_out = tf.Print(w_out, [K.sum(w_c[0], axis=-1), K.sum(w_g[0], axis=-1), K.sum(w_tilda[0], axis=-1), K.sum(w_out[0], axis=-1)], message="_get_weight_vectors sum calculations: If all one, all is good. ")
         
         lowerBoundAlert = tf.assert_non_negative(w_out, message="weights vector had value < 0")
         upperBoundAlert = tf.assert_non_positive(w_out - 1, message="weights vector had value > 1")
         with tf.control_dependencies([lowerBoundAlert, upperBoundAlert]):
             w_out = -w_out
             w_out = -w_out
-
         return w_out
 
-    def _run_controller(self, inputs, read_vector, controller_state):
-        # FIXME: Could we spare ourself the hassle by setting the LSTM statefullness to True?
-        #Warning: This is highly sensitive to the implementation of the LSTM, which could change. For example, it
-        #        already breaks if we implementation 0 instead of implementation 2.
-        controller = self.controller
+    def _run_controller(self, inputs, read_vector):
         controller_input = K.concatenate([inputs, read_vector])
-        # begin magic: (inspired by EderSantana)
-        # TODO: I'm quite sure this could be done less implementation-sensitive.
-        if len(controller_state) in [1,2]: #LSTM or GRU
-            if hasattr(controller, "get_constants"):
-                BW,BU = controller.get_constants(controller_input)
-                controller_state += (BW,BU)
-                controller_output, controller_state = controller.step(controller_input, controller_state)
-        else: # dense
-            controller_output = controller.call(controller_input)
-        return controller_output, controller_state
+        if self.controller_architecture in ['gru', 'lstm']:
+            # for recurrent controllers: make input temporal
+            controller_input = controller_input[:,None,:]
+        controller_output = self.controller.call(controller_input)
+        return controller_output
 
 
 
@@ -328,9 +308,6 @@ class NeuralTuringMachine(Recurrent):
         # As a step function MUST return its regular output as the first element in the list of states,
         # we have _ here.
         _, M_tm1, w_read_tm1, w_write_tm1 = states[:4]
-        controller_states = list(states[4:]) #this could be empty (FF), length 1 (GRU) or length 2 (LSTM)
-        
-
 
         # We have the Memory M_tm1 (t minus one / t-1), and a read weighting w_read_tm1 calculated in the last
         # step. This is enough to calculate the read_vector we feed into the controller:
@@ -340,7 +317,7 @@ class NeuralTuringMachine(Recurrent):
         # which we have to provide with the actual input from outside, the information we've read an the states which
         # are relevant to the controller.
         # TODO make description more precise
-        controller_output, controller_states = self._run_controller(inputs, read_vector, controller_states)
+        controller_output = self._run_controller(inputs, read_vector)
 
         # Now we split the controller output into actual output, read head adressing, write head adressing, etc.
         # TODO: make more precise
@@ -411,6 +388,6 @@ class NeuralTuringMachine(Recurrent):
 
         # Now lets pack up the state in a list and call it a day.
         # ntm_output = tf.Print(ntm_output, [gamma_read, gamma_write], message="gamma_read, gamma_write")
-        return ntm_output, [ntm_output] + [M, w_read, w_write] + controller_states
+        return ntm_output, [ntm_output, M, w_read, w_write] 
 
 
