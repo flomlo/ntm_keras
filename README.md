@@ -30,12 +30,14 @@ is success, but not huge success.
 
 
 
-Why is it success? Compare it with just the controller alone, i.e a 1x8 dense layer in temporal wrapping:
+Why is it success? Compare it with just the controller alone, i.e a singe units=8 dense layer in temporal wrapping:
 This can be tested via:
 
     python main.py dense 
 
-And results in TODO
+And results in what is to be expected: 50% before, 50% after training. At least
+the training was quick, taking only one minute (with the PCI-Express being the
+bottleneck). 
 
 
 
