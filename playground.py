@@ -6,7 +6,7 @@ from keras.optimizers import Adam
 from model_ntm import gen_model
 from testing_utils import lengthy_test
 
-lr = 3e-5
+lr = 3e-6
 clipnorm = 10
 sgd = Adam(lr=lr, clipnorm=clipnorm)
 
@@ -26,8 +26,9 @@ controller.add(Dense(units=100,
 controller.compile(loss='binary_crossentropy', optimizer=sgd, metrics = ['binary_accuracy'], sample_weight_mode="temporal")
 
 model = gen_model(input_dim=10, output_dim=8, batch_size=100,
+        n_slots=128,
         controller_model=controller)
 
 lengthy_test(model, epochs=1000)
 
-import pudb, pu.db
+import pudb; pu.db

@@ -25,7 +25,7 @@ This builds a NTM with *one* dense layer of appropriate size, tries it on the co
 trains it on 1 million samples (1000 epochs of each 1000 freshly generated samples length between 5 and 20, adjust that
 in main.py), which takes about 3h a GTX 1050Ti. 
 
-For me that resulted in 50% accuracy (seen bitwise) before training, and TODO 80%, 75%, 73%, 64%, 50% after training. Which
+For me that resulted in 50% accuracy (seen bitwise) before training, and 83%, 93%, 93%, 81%, 54% after training. Which
 is success, but not huge success.
 
 
