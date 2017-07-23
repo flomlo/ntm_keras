@@ -107,6 +107,7 @@ class NeuralTuringMachine(Recurrent):
     """
     def __init__(self, output_dim, n_slots, m_length, shift_range=3,
                         controller_architecture='dense',
+                        controller_model=None,
                         batch_size=777,                 
                         stateful=False,
 #                        input_shape = (None, 8), 
@@ -117,6 +118,7 @@ class NeuralTuringMachine(Recurrent):
         self.m_length = m_length
         self.shift_range = shift_range
         self.controller_architecture = controller_architecture
+        self.controller_model = controller_model
         self.batch_size = batch_size
         self.return_sequence = True
         self.stateful = stateful
@@ -186,11 +188,19 @@ class NeuralTuringMachine(Recurrent):
                 units = self.controller_output_dim,
                 input_shape = (bs, input_length, self.controller_input_dim))
 
+        elif self.controller_model is not None:
+            # Oh man, handling a whole fucking model as a controller is very very cool.
+            # Keras is da shit.
+            self.controller = self.controller_model
+
         else:
-            # FEATURE REQUEST: Handling a whole Keras *model* as controller would be so incredible cool.
             raise ValueError('this controller_architecture is not implemented yet.')
 
-        self.controller.build(input_shape=(self.batch_size, input_length, input_dim + self.m_length))
+
+        if self.controller_model is not None:
+            print("using model als controller. experimental! especially if it has state.")
+        else:
+            self.controller.build(input_shape=(self.batch_size, input_length, input_dim + self.m_length))
 
         self.C = _circulant(self.n_slots, self.shift_range)
 
@@ -221,9 +231,8 @@ class NeuralTuringMachine(Recurrent):
 
     def get_initial_state(self, X):
         #FIXME! make batchsize variable, not fixed with model 
-
-        if not self.stateful:
-            self.controller.reset_states()
+        #if not self.stateful:
+        #    self.controller.reset_states()
 
         init_old_ntm_output = K.ones((self.batch_size, self.output_dim), name="init_old_ntm_output")*0.42 # never used.
         #init_M = K.ones((batch_size, self.n_slots , self.m_length), name='main_memory')*self.m_length**-0.5
@@ -273,20 +282,22 @@ class NeuralTuringMachine(Recurrent):
         # Equation 9:
         w_out = _renorm(w_tilda ** gamma)
 
-        w_out = tf.Print(w_out, [w_tm1[0], M[0], k[0], beta[0], s[0], gamma[0]], message="_get_weight_vectors inputs: w_tm1, M, k, beta, s, gamma ")
-        w_out = tf.Print(w_out, [num[0], w_c[0], w_g[0], C_s[0], w_tilda[0], w_out[0]], message="_get_weight_vectors calculations:num, w_c,  w_g, C_s, w_tilda, w_out ")
-        w_out = tf.Print(w_out, [K.sum(w_c[0], axis=-1), K.sum(w_g[0], axis=-1), K.sum(w_tilda[0], axis=-1), K.sum(w_out[0], axis=-1)], message="_get_weight_vectors sum calculations: If all one, all is good. ")
+        #w_out = tf.Print(w_out, [w_tm1[0], M[0], k[0], beta[0], s[0], gamma[0]], message="_get_weight_vectors inputs: w_tm1, M, k, beta, s, gamma ")
+        #w_out = tf.Print(w_out, [num[0], w_c[0], w_g[0], C_s[0], w_tilda[0], w_out[0]], message="_get_weight_vectors calculations:num, w_c,  w_g, C_s, w_tilda, w_out ")
+        #w_out = tf.Print(w_out, [K.sum(w_c[0], axis=-1), K.sum(w_g[0], axis=-1), K.sum(w_tilda[0], axis=-1), K.sum(w_out[0], axis=-1)], message="_get_weight_vectors sum calculations: If all one, all is good. ")
         
-        lowerBoundAlert = tf.assert_non_negative(w_out, message="weights vector had value < 0")
-        upperBoundAlert = tf.assert_non_positive(w_out - 1, message="weights vector had value > 1")
-        with tf.control_dependencies([lowerBoundAlert, upperBoundAlert]):
-            w_out = -w_out
-            w_out = -w_out
+        #lowerBoundAlert = tf.assert_non_negative(w_out, message="weights vector had value < 0")
+        #upperBoundAlert = tf.assert_non_positive(w_out - 1, message="weights vector had value > 1")
+        #with tf.control_dependencies([lowerBoundAlert, upperBoundAlert]):
+        #    w_out = -w_out
+        #    w_out = -w_out
         return w_out
 
     def _run_controller(self, inputs, read_vector):
         controller_input = K.concatenate([inputs, read_vector])
         if self.controller_architecture in ['gru', 'lstm']:
+        #if len(self.controller_architecture.input_shape) > 2:
+            # TODO: generalize with flag for model controllers
             # for recurrent controllers: make input temporal
             controller_input = controller_input[:,None,:]
         controller_output = self.controller.call(controller_input)
