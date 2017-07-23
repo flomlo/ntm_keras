@@ -1,9 +1,6 @@
 import numpy as np
 
 
-LOG_PATH_BASE="/proj/ciptmp/te58rone/logs/"
-
-
 def get_sample(batch_size=128, in_bits=10, out_bits=8, max_size=20, min_size=1):
     # in order to be a generator, we start with an endless loop:
     while True:
