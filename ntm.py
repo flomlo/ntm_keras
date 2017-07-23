@@ -205,12 +205,6 @@ class NeuralTuringMachine(Recurrent):
         self.C = _circulant(self.n_slots, self.shift_range)
 
         self.trainable_weights += self.controller.trainable_weights 
-        # By declaring our memory as a weight (non-trainable), we can easily look at it via model.get_weigths.
-        self.M = self.add_weight(shape=(self.batch_size, self.n_slots, self.m_length),
-                                    name="Main_Memory",
-                     #               initializer=Constant(self.m_length**-0.5), # better cosine stabily
-                                    initializer=Constant(0.001),
-                                    trainable=False)
 
         # We need to declare the number of states we want to carry around.
         # In our case the dimension seems to be 6 (LSTM) or 5 (GRU) or 4 (FF),
@@ -235,8 +229,7 @@ class NeuralTuringMachine(Recurrent):
         #    self.controller.reset_states()
 
         init_old_ntm_output = K.ones((self.batch_size, self.output_dim), name="init_old_ntm_output")*0.42 # never used.
-        #init_M = K.ones((batch_size, self.n_slots , self.m_length), name='main_memory')*self.m_length**-0.5
-        init_M = self.M
+        init_M = K.ones((self.batch_size, self.n_slots , self.m_length), name='main_memory')*0.001
         init_wr = np.zeros((self.batch_size, self.n_slots))
         init_wr[:,0] = 1    # turns out that uniform initialisation is almost perfectly unperfect.
         init_wr = K.variable(init_wr, name="init_weights_read")
