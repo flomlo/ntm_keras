@@ -46,7 +46,7 @@ def lengthy_test(model, testrange=[5,10,20,40,80], epochs=100):
     ts = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
     log_path = LOG_PATH_BASE + ts + "_-_" + model.name 
     tensorboard = TensorBoard(log_dir=log_path, write_graph=True)
-    model_saver =  ModelCheckpoint(log_path + "/model.ckpt.{epoch:d}.hdf5", monitor='loss')
+    model_saver =  ModelCheckpoint(log_path + "/model.ckpt.{epoch:d}.hdf5", monitor='loss', period=10)
     callbacks = [tensorboard, model_saver, keras.callbacks.TerminateOnNaN()]
 
     for i in testrange:
