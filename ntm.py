@@ -358,7 +358,7 @@ class NeuralTuringMachine(Recurrent):
         shift_read      = controller_read_emitted_data[:, self.m_length + 1 + 1 : self.m_length + 1 + 1 + self.shift_range]
         shift_read      = K.softmax(shift_read)  # normalize it via softmax
         gamma_read      = controller_read_emitted_data[:, -1 :]
-        gamma_read      = K.clip(5* gamma_read +0.5, 1, 10) 
+        gamma_read      = K.clip(gamma_read**-1, 1, 10) 
 
         k_write         = controller_write_emitted_data[:, : self.m_length] 
         k_write         += self.m_length**-0.5 -0.5
@@ -369,7 +369,7 @@ class NeuralTuringMachine(Recurrent):
         shift_write     = controller_write_emitted_data[:, self.m_length + 1 + 1 : self.m_length + 1 + 1 + self.shift_range]
         shift_write     = K.softmax(shift_write)  # normalize it via softmax
         gamma_write     = controller_write_emitted_data[:, self.m_length + 1 + 1 + self.shift_range : - 2*self.m_length]
-        gamma_write     = K.clip(5*gamma_write +0.5, 1, 5) 
+        gamma_write     = K.clip(gamma_write**-1, 1, 10) 
         erase_vector    = controller_write_emitted_data[:, -2*self.m_length : -self.m_length]
         erase_vector    += -0.5 # zero is fine
         add_vector      = controller_write_emitted_data[:, -self.m_length : ]

@@ -38,4 +38,3 @@ from testing_utils import lengthy_test
 lengthy_test(model, epochs=epochs)
 
 
-import pudb; pu.db

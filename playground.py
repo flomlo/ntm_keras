@@ -6,7 +6,7 @@ from keras.optimizers import Adam
 from model_ntm import gen_model
 from testing_utils import lengthy_test
 
-lr = 3e-6
+lr = 1e-4
 clipnorm = 10
 sgd = Adam(lr=lr, clipnorm=clipnorm)
 
@@ -31,4 +31,3 @@ model = gen_model(input_dim=10, output_dim=8, batch_size=100,
 
 lengthy_test(model, epochs=1000)
 
-import pudb; pu.db
