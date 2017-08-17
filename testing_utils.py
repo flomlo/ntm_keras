@@ -9,7 +9,7 @@ LOG_PATH_BASE="/proj/ciptmp/te58rone/logs/"     #this is for tensorboard callbac
 
 
 
-def test_model(model, sequence_length=None, verboose=True):
+def test_model(model, sequence_length=None, verboose=False):
     input_dim = model.input_dim
     output_dim = model.output_dim
     batch_size = model.batch_size
@@ -23,30 +23,40 @@ def test_model(model, sequence_length=None, verboose=True):
         x = V[:, -sequence_length:, :] == Y[:, -sequence_length:, :]
         acc = x.mean() * 100
         if verboose:
+            print("the overall accuracy for sequence_length {0} was: {1}".format(sequence_length, x.mean()))
+            print("per bit")
             print(x.mean(axis=(0,1)))
+            print("per timeslot")
             print(x.mean(axis=(0,2)))
-            print(x.mean())
     else:
         ntm = model.layers[0]
-        k, b, M = ntm.get_weights()
+        k, b = ntm.get_weights()
         import pudb; pu.db
         acc = 0
     return acc
 
 
-def train_model(model, epochs=10, min_size=5, max_size=20, callbacks=None):
+def train_model(model, epochs=10, min_size=5, max_size=20, callbacks=None, verboose=True):
     input_dim = model.input_dim
     output_dim = model.output_dim
     batch_size = model.batch_size
 
     sample_generator = get_sample(batch_size=batch_size, in_bits=input_dim, out_bits=output_dim,
                                                 max_size=max_size, min_size=min_size)
-    model.fit_generator(sample_generator, steps_per_epoch=15, epochs=epochs, callbacks=callbacks)
+    if verboose:
+        for j in range(epochs):
+            model.fit_generator(sample_generator, steps_per_epoch=15, epochs=j+1, callbacks=callbacks, initial_epoch=j)
+            print("currently at epoch {0}".format(j+1))
+            for i in [5,10,20,40]:
+                test_model(model, sequence_length=i, verboose=True)
+    else:
+        model.fit_generator(sample_generator, steps_per_epoch=15, epochs=epochs, callbacks=callbacks)
+
 
     print("done training")
 
 
-def lengthy_test(model, testrange=[5,10,20,40,80], epochs=100):
+def lengthy_test(model, testrange=[5,10,20,40,80], epochs=100, verboose=False):
     ts = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
     log_path = LOG_PATH_BASE + ts + "_-_" + model.name 
     tensorboard = TensorBoard(log_dir=log_path, write_graph=True)
@@ -57,7 +67,7 @@ def lengthy_test(model, testrange=[5,10,20,40,80], epochs=100):
         acc = test_model(model, sequence_length=i)
         print("the accuracy for length {0} was: {1}%".format(i,acc))
 
-    train_model(model, epochs=epochs, callbacks=callbacks)
+    train_model(model, epochs=epochs, callbacks=callbacks, verboose=verboose)
 
     for i in testrange:
         acc = test_model(model, sequence_length=i)
