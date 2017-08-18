@@ -30,13 +30,13 @@ def test_model(model, sequence_length=None, verboose=False):
             print(x.mean(axis=(0,2)))
     else:
         ntm = model.layers[0]
-        k, b = ntm.get_weights()
+        weights = ntm.get_weights()
         import pudb; pu.db
         acc = 0
     return acc
 
 
-def train_model(model, epochs=10, min_size=5, max_size=20, callbacks=None, verboose=True):
+def train_model(model, epochs=10, min_size=5, max_size=20, callbacks=None, verboose=False):
     input_dim = model.input_dim
     output_dim = model.output_dim
     batch_size = model.batch_size
@@ -56,12 +56,17 @@ def train_model(model, epochs=10, min_size=5, max_size=20, callbacks=None, verbo
     print("done training")
 
 
-def lengthy_test(model, testrange=[5,10,20,40,80], epochs=100, verboose=False):
+def lengthy_test(model, testrange=[5,10,20,40,80], epochs=100, verboose=True):
     ts = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
     log_path = LOG_PATH_BASE + ts + "_-_" + model.name 
-    tensorboard = TensorBoard(log_dir=log_path, write_graph=True)
-    model_saver =  ModelCheckpoint(log_path + "/model.ckpt.{epoch:d}.hdf5", monitor='loss', period=20)
-    callbacks = [tensorboard, model_saver, keras.callbacks.TerminateOnNaN()]
+    tensorboard = TensorBoard(log_dir=log_path,
+                                write_graph=False, #This eats a lot of space. Enable with caution!
+                                histogram_freq = 1,
+                                write_images=True,
+                                batch_size = model.batch_size,
+                                write_grads=True)
+    model_saver =  ModelCheckpoint(log_path + "/model.ckpt.{epoch:04d}.hdf5", monitor='loss', period=20)
+    callbacks = [tensorboard, keras.callbacks.TerminateOnNaN(), model_saver]
 
     for i in testrange:
         acc = test_model(model, sequence_length=i)
