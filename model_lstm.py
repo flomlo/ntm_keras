@@ -4,7 +4,7 @@ from keras.layers import LSTM, Activation
 from keras.optimizers import Adam
 
 batch_size = 100
-lr = 3e-5
+lr = 5e-4
 clipnorm = 10
 units = 256
 

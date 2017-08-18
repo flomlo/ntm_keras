@@ -12,7 +12,7 @@ from ntm import NeuralTuringMachine as NTM
 
 n_slots = 128
 m_length = 20
-learning_rate = 1e-5
+learning_rate = 5e-4
 clipnorm = 10
 
 def gen_model(input_dim, batch_size, output_dim,

@@ -3,7 +3,7 @@ from keras.models import Sequential
 from keras.layers import Activation, Dense
 from keras.optimizers import Adam
 
-lr = 3e-5
+lr = 4e-4
 clipnorm = 10
 units = 256
 
