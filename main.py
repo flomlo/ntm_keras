@@ -1,8 +1,5 @@
 import argparse
 
-#import model_ntm
-#import model_dense
-
 output_dim = 8
 input_dim = output_dim + 2  # this is the actual input dim of the network, that includes two dims for flags
 batch_size = 100
