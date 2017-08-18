@@ -33,7 +33,6 @@ else:
     raise ValueError("this model is not implemented yet")
 
 print("model built, starting the copy experiment")
-import pudb; pu.db
 from testing_utils import lengthy_test
 lengthy_test(model, epochs=epochs)
 

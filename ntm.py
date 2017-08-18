@@ -37,7 +37,7 @@
 #
 
 
-
+import warnings
 import numpy as np
 import tensorflow as tf
 
@@ -105,15 +105,15 @@ class NeuralTuringMachine(Recurrent):
     Currently batch_input_size is necessary. Or not? Im not even sure :(
 
     """
-    def __init__(self, output_dim, n_slots, m_length, shift_range=3,
+    def __init__(self, units, n_slots, m_length, shift_range=3,
                         controller_architecture='dense',
                         controller_model=None,
                         batch_size=777,                 
                         stateful=False,
 #                        input_shape = (None, 8), 
                         **kwargs):
-        self.output_dim = output_dim
-        self.units = output_dim
+        self.output_dim = units
+        self.units = units
         self.n_slots = n_slots
         self.m_length = m_length
         self.shift_range = shift_range
@@ -164,10 +164,13 @@ class NeuralTuringMachine(Recurrent):
 
         # Now that we've calculated the shape of the controller, we have add it to the layer/model.
         if self.controller_architecture == 'gru':
-            raise ValueError('This controller_architecture is not implemented yet. But it should be minor work, adjusting some initial state and stuff. try it yourself!')
+            warnings.warn('This controller_architecture has not been tested. Might work, might not.')
             self.controller = GRU(
-                name = "controller"
-                #TODO
+                name = "controller",
+                units= self.controller_output_dim,
+                stateful = True,
+                batch_size = self.batch_size,
+                activation = 'sigmoid',
                 )
 
         elif self.controller_architecture == 'lstm':
@@ -228,10 +231,10 @@ class NeuralTuringMachine(Recurrent):
         #if not self.stateful:
         #    self.controller.reset_states()
 
-        init_old_ntm_output = K.ones((self.batch_size, self.output_dim), name="init_old_ntm_output")*0.42 # never used.
+        init_old_ntm_output = K.ones((self.batch_size, self.output_dim), name="init_old_ntm_output")*0.42 
         init_M = K.ones((self.batch_size, self.n_slots , self.m_length), name='main_memory')*0.001
         init_wr = np.zeros((self.batch_size, self.n_slots))
-        init_wr[:,0] = 1    # turns out that uniform initialisation is almost perfectly unperfect.
+        init_wr[:,0] = 1
         init_wr = K.variable(init_wr, name="init_weights_read")
         init_ww = np.zeros((self.batch_size, self.n_slots))
         init_ww[:,0] = 1
@@ -393,5 +396,4 @@ class NeuralTuringMachine(Recurrent):
         # Now lets pack up the state in a list and call it a day.
         # ntm_output = tf.Print(ntm_output, [gamma_read, gamma_write], message="gamma_read, gamma_write")
         return ntm_output, [ntm_output, M, w_read, w_write] 
-
 
