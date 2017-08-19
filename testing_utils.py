@@ -2,7 +2,7 @@ from copyTask import get_sample
 from datetime import datetime
 import numpy as np
 import keras
-from keras.callbacks import TensorBoard, ModelCheckpoint
+from keras.callbacks import TensorBoard, ModelCheckpoint, TerminateOnNaN
 
 LOG_PATH_BASE="/proj/ciptmp/te58rone/logs/"     #this is for tensorboard callbacks
 
@@ -52,7 +52,6 @@ def train_model(model, epochs=10, min_size=5, max_size=20, callbacks=None, verbo
     else:
         model.fit_generator(sample_generator, steps_per_epoch=15, epochs=epochs, callbacks=callbacks)
 
-
     print("done training")
 
 
@@ -65,16 +64,16 @@ def lengthy_test(model, testrange=[5,10,20,40,80], epochs=100, verboose=True):
                                 write_images=True,
                                 batch_size = model.batch_size,
                                 write_grads=True)
-    model_saver =  ModelCheckpoint(log_path + "/model.ckpt.{epoch:04d}.hdf5", monitor='loss', period=20)
-    callbacks = [tensorboard, keras.callbacks.TerminateOnNaN(), model_saver]
+    model_saver =  ModelCheckpoint(log_path + "/model.ckpt.{epoch:04d}.hdf5", monitor='loss', period=1)
+    callbacks = [tensorboard, TerminateOnNaN(), model_saver]
 
     for i in testrange:
-        acc = test_model(model, sequence_length=i)
+        acc = test_model(model, sequence_length=i, verboose=verboose)
         print("the accuracy for length {0} was: {1}%".format(i,acc))
 
     train_model(model, epochs=epochs, callbacks=callbacks, verboose=verboose)
 
     for i in testrange:
-        acc = test_model(model, sequence_length=i)
+        acc = test_model(model, sequence_length=i, verboose=verboose)
         print("the accuracy for length {0} was: {1}%".format(i,acc))
     return
