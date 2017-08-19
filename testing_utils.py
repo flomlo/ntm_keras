@@ -4,7 +4,7 @@ import numpy as np
 import keras
 from keras.callbacks import TensorBoard, ModelCheckpoint, TerminateOnNaN
 
-LOG_PATH_BASE="/proj/ciptmp/te58rone/logs/"     #this is for tensorboard callbacks
+LOG_PATH_BASE="logs/"     #this is for tensorboard callbacks
 
 
 

@@ -372,6 +372,6 @@ class NeuralTuringMachine(Recurrent):
 
         # Now lets pack up the state in a list and call it a day.
         # ntm_output = tf.Print(ntm_output, [gamma_read, gamma_write], message="gamma_read, gamma_write")
-        M = tf.Print(M, [K.mean(M), K.max(M), K.min(M)], message="memory stats")
+        # M = tf.Print(M, [K.mean(M), K.max(M), K.min(M)], message="memory stats")
         return ntm_output, [ntm_output, M, w_read, w_write] 
 
