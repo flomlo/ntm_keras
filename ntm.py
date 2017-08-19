@@ -89,6 +89,45 @@ def _cosine_distance(M, k):
     #cosine_distance = tf.Print(cosine_distance, [nM[0], nk[0], cosine_distance[0]], message="_cosine_distance_numbers")
     return cosine_distance
 
+def _controller_read_head_emitting_dim(m_depth, shift_range):
+    # For calculating the controller output dimension, we need the output_dim of the whole layer
+    # (which is only passed during building) plus all the stuff we need to interact with the memory,
+    # calculated here:
+    #
+    # For every read head the addressing data (for details, see figure 2):
+    #       key_vector (m_depth) 
+    #       beta (1)
+    #       g (1)
+    #       shift_vector (shift_range)
+    #       gamma (1)
+    return (m_depth + 1 + 1 + shift_range + 1)
+
+def _controller_write_head_emitting_dim(m_depth, shift_range):
+    controller_read_head_emitting_dim = _controller_read_head_emitting_dim(m_depth, shift_range)
+    # But what do for write heads? The adressing_data_dim is the same, but we emit additionally:
+    #       erase_vector (m_depth)
+    #       add_vector (m_depth)
+    return controller_read_head_emitting_dim + 2*m_depth
+
+def controller_input_output_shape(input_dim, output_dim, m_depth, n_slots, shift_range, read_heads, write_heads):
+    controller_read_head_emitting_dim = _controller_read_head_emitting_dim(m_depth, shift_range)
+    controller_write_head_emitting_dim = _controller_write_head_emitting_dim(m_depth, shift_range)
+
+    # The controller output size consists of 
+    #       the regular output dim
+    # plus, for every read and write head the respective dims times the number of heads.
+    controller_output_dim = (output_dim + 
+            read_heads * controller_read_head_emitting_dim + 
+            write_heads * controller_write_head_emitting_dim)
+    # For the input shape of the controller the formula is a bit easier:
+    #       the regular input_dim 
+    # plus, for every read head:
+    #       read_vector (m_depth).
+    # So that results in:
+    controller_input_dim = input_dim + m_depth
+
+    return controller_input_dim, controller_output_dim
+
 
 class NeuralTuringMachine(Recurrent):
     """ Neural Turing Machines
@@ -98,116 +137,58 @@ class NeuralTuringMachine(Recurrent):
     shift_range: int, number of available shifts, ex. if 3, avilable shifts are
                  (-1, 0, 1)
     n_slots: number of memory locations, defined in 3.1 as N
-    m_length: memory length at each location, defined in 3.1 as M
+    m_depth: memory length at each location, defined in 3.1 as M
 
     Known issues:
     -------------
     Currently batch_input_size is necessary. Or not? Im not even sure :(
 
     """
-    def __init__(self, units, n_slots, m_length, shift_range=3,
-                        controller_architecture='dense',
+    def __init__(self, units, n_slots, m_depth,
+                        shift_range=3,
                         controller_model=None,
                         batch_size=777,                 
                         stateful=False,
-#                        input_shape = (None, 8), 
                         **kwargs):
         self.output_dim = units
         self.units = units
         self.n_slots = n_slots
-        self.m_length = m_length
+        self.m_depth = m_depth
         self.shift_range = shift_range
-        self.controller_architecture = controller_architecture
         self.controller_model = controller_model
         self.batch_size = batch_size
         self.return_sequence = True
         self.stateful = stateful
-        # For calculating the controller output dimension, we need the output_dim of the whole layer
-        # (which is only passed during building) plus all the stuff we need to interact with the memory,
-        # calculated here:
-        #
-        # For every read head the addressing data (for details, see figure 2):
-        #       key_vector (m_length) 
-        #       beta (1)
-        #       g (1)
-        #       shift_vector (shift_range)
-        #       gamma (1)
-        self.controller_read_head_emitting_dim = (
-                m_length + 1 + 1 + shift_range + 1)
-        # But what do for write heads? The adressing_data_dim is the same, but we emit additionally:
-        #       erase_vector (m_length)
-        #       add_vector (m_length)
-        self.controller_write_head_emitting_dim = (
-                        self.controller_read_head_emitting_dim + 
-                        2 * m_length)
+
+        self.controller_read_head_emitting_dim = _controller_read_head_emitting_dim(m_depth, shift_range)
+        self.controller_write_head_emitting_dim = _controller_write_head_emitting_dim(m_depth, shift_range)
 
         super(NeuralTuringMachine, self).__init__(**kwargs)
-
-        
-
 
     def build(self, input_shape):
         bs, input_length, input_dim = input_shape
 
-        # The controller output size:
-        # TODO: arbitrary number of write/read heads
-        self.controller_output_dim = (self.output_dim + 
-                self.controller_read_head_emitting_dim + 
-                self.controller_write_head_emitting_dim)
-        # For the input shape of the controller the formula is a bit easier:
-        #       the regular input_dim (output_dim)
-        # plus, for every read head:
-        #       read_vector (m_length).
-        # So that results in:
-        # TODO: arbitrary number of read heads
-        self.controller_input_dim = input_dim + self.m_length
-
+        self.controller_input_dim, self.controller_output_dim = controller_input_output_shape(
+                input_dim, self.units, self.m_depth, self.n_slots, self.shift_range, 1, 1)
+            
         # Now that we've calculated the shape of the controller, we have add it to the layer/model.
-        if self.controller_architecture == 'gru':
-            warnings.warn('This controller_architecture has not been tested. Might work, might not.')
-            self.controller = GRU(
-                name = "controller",
-                units= self.controller_output_dim,
-                stateful = True,
-                batch_size = self.batch_size,
-                activation = 'sigmoid',
-                )
-
-        elif self.controller_architecture == 'lstm':
-            self.controller = LSTM(
-                name = "controller",
-                units= self.controller_output_dim,
-                stateful = True,
-                batch_size = self.batch_size,
-                activation = 'sigmoid',
-                implementation = 2,     # best for gpu. other ones also might not work.
-                input_shape = (bs, input_length, self.controller_input_dim))
-
-        elif self.controller_architecture is 'dense':
+        if self.controller_model is None:
             self.controller = Dense(
                 name = "controller",
                 activation = 'sigmoid',
                 bias_initializer = 'zeros',
                 units = self.controller_output_dim,
                 input_shape = (bs, input_length, self.controller_input_dim))
-
-        elif self.controller_model is not None:
+            self.controller.build(input_shape=(self.batch_size, input_length, input_dim + self.m_depth))
+        else:
             # Oh man, handling a whole fucking model as a controller is very very cool.
             # Keras is da shit.
             self.controller = self.controller_model
 
-        else:
-            raise ValueError('this controller_architecture is not implemented yet.')
-
-
-        if self.controller_model is not None:
-            print("using model als controller. experimental! especially if it has state.")
-        else:
-            self.controller.build(input_shape=(self.batch_size, input_length, input_dim + self.m_length))
-
+        # This is a fixed shift matrix
         self.C = _circulant(self.n_slots, self.shift_range)
 
-        self.trainable_weights += self.controller.trainable_weights 
+        self.trainable_weights = self.controller.trainable_weights 
 
         # We need to declare the number of states we want to carry around.
         # In our case the dimension seems to be 6 (LSTM) or 5 (GRU) or 4 (FF),
@@ -219,7 +200,7 @@ class NeuralTuringMachine(Recurrent):
         # I only copied from keras/recurrent.py.
         self.states = [None, None, None, None]
         self.state_spec = [InputSpec(shape=(None, self.output_dim)),                            # old_ntm_output
-                            InputSpec(shape=(None, self.n_slots * self.m_length)),              # Memory
+                            InputSpec(shape=(None, self.n_slots * self.m_depth)),              # Memory
                             InputSpec(shape=(None, self.n_slots)),                              # init_wr
                             InputSpec(shape=(None, self.n_slots))]                              # init_ww
 
@@ -227,12 +208,11 @@ class NeuralTuringMachine(Recurrent):
 
 
     def get_initial_state(self, X):
-        #FIXME! make batchsize variable, not fixed with model 
         #if not self.stateful:
         #    self.controller.reset_states()
 
         init_old_ntm_output = K.ones((self.batch_size, self.output_dim), name="init_old_ntm_output")*0.42 
-        init_M = K.ones((self.batch_size, self.n_slots , self.m_length), name='main_memory')*0.001
+        init_M = K.ones((self.batch_size, self.n_slots , self.m_depth), name='main_memory')*0.001
         init_wr = np.zeros((self.batch_size, self.n_slots))
         init_wr[:,0] = 1
         init_wr = K.variable(init_wr, name="init_weights_read")
@@ -291,10 +271,7 @@ class NeuralTuringMachine(Recurrent):
 
     def _run_controller(self, inputs, read_vector):
         controller_input = K.concatenate([inputs, read_vector])
-        if self.controller_architecture in ['gru', 'lstm']:
-        #if len(self.controller_architecture.input_shape) > 2:
-            # TODO: generalize with flag for model controllers
-            # for recurrent controllers: make input temporal
+        if len(self.controller.input_shape) is 3: # this catches controllers with state
             controller_input = controller_input[:,None,:]
         controller_output = self.controller.call(controller_input)
         return controller_output
@@ -352,30 +329,30 @@ class NeuralTuringMachine(Recurrent):
 
         # We asume that our default value is 0.5 for everything, as it is sigmoid(0).
 
-        k_read          = controller_read_emitted_data[:, : self.m_length] 
-        k_read          += self.m_length**-0.5 - 0.5
-        beta_read       = controller_read_emitted_data[:, self.m_length : self.m_length + 1] 
+        k_read          = controller_read_emitted_data[:, : self.m_depth] 
+        k_read          += self.m_depth**-0.5 - 0.5
+        beta_read       = controller_read_emitted_data[:, self.m_depth : self.m_depth + 1] 
         beta_read       += 0.5 #actually I have no clue what a good magic value would be for that, but 1 is multiplication neutral
-        g_read          = controller_read_emitted_data[:, self.m_length + 1: self.m_length + 1 + 1] 
+        g_read          = controller_read_emitted_data[:, self.m_depth + 1: self.m_depth + 1 + 1] 
         g_read          += 0.0  
-        shift_read      = controller_read_emitted_data[:, self.m_length + 1 + 1 : self.m_length + 1 + 1 + self.shift_range]
+        shift_read      = controller_read_emitted_data[:, self.m_depth + 1 + 1 : self.m_depth + 1 + 1 + self.shift_range]
         shift_read      = K.softmax(shift_read)  # normalize it via softmax
         gamma_read      = controller_read_emitted_data[:, -1 :]
         gamma_read      = K.clip(gamma_read**-1, 1, 10) 
 
-        k_write         = controller_write_emitted_data[:, : self.m_length] 
-        k_write         += self.m_length**-0.5 -0.5
-        beta_write      = controller_write_emitted_data[:, self.m_length : self.m_length + 1] 
+        k_write         = controller_write_emitted_data[:, : self.m_depth] 
+        k_write         += self.m_depth**-0.5 -0.5
+        beta_write      = controller_write_emitted_data[:, self.m_depth : self.m_depth + 1] 
         beta_write      += 0.5
-        g_write         = controller_write_emitted_data[:, self.m_length + 1: self.m_length + 1 + 1] 
+        g_write         = controller_write_emitted_data[:, self.m_depth + 1: self.m_depth + 1 + 1] 
         g_write         += 0.0  
-        shift_write     = controller_write_emitted_data[:, self.m_length + 1 + 1 : self.m_length + 1 + 1 + self.shift_range]
+        shift_write     = controller_write_emitted_data[:, self.m_depth + 1 + 1 : self.m_depth + 1 + 1 + self.shift_range]
         shift_write     = K.softmax(shift_write)  # normalize it via softmax
-        gamma_write     = controller_write_emitted_data[:, self.m_length + 1 + 1 + self.shift_range : - 2*self.m_length]
+        gamma_write     = controller_write_emitted_data[:, self.m_depth + 1 + 1 + self.shift_range : - 2*self.m_depth]
         gamma_write     = K.clip(gamma_write**-1, 1, 10) 
-        erase_vector    = controller_write_emitted_data[:, -2*self.m_length : -self.m_length]
-        erase_vector    += -0.5 # zero is fine
-        add_vector      = controller_write_emitted_data[:, -self.m_length : ]
+        erase_vector    = controller_write_emitted_data[:, -2*self.m_depth : -self.m_depth]
+        erase_vector    += 0 # erase vector must lie in (0,1). 
+        add_vector      = controller_write_emitted_data[:, -self.m_depth : ]
         add_vector      += -0.5 # zero is fine
 
 
@@ -395,5 +372,6 @@ class NeuralTuringMachine(Recurrent):
 
         # Now lets pack up the state in a list and call it a day.
         # ntm_output = tf.Print(ntm_output, [gamma_read, gamma_write], message="gamma_read, gamma_write")
+        M = tf.Print(M, [K.mean(M), K.max(M), K.min(M)], message="memory stats")
         return ntm_output, [ntm_output, M, w_read, w_write] 
 

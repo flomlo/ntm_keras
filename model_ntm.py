@@ -11,29 +11,22 @@ from ntm import NeuralTuringMachine as NTM
 
 
 n_slots = 128
-m_length = 20
+m_depth = 20
 learning_rate = 5e-4
 clipnorm = 10
 
 def gen_model(input_dim, batch_size, output_dim,
                 n_slots=n_slots,
-                m_length=m_length,
-                controller_architecture=None,
+                m_depth=m_depth,
                 controller_model=None):
-    model = Sequential()
-    if controller_architecture is not None:
-        model.name = "NTM_-_" + controller_architecture
-    elif controller_model is not None:
-        model.name = "NTM_-_" + controller_model.name
-    else:
-        print("please specify a controller")
 
+    model = Sequential()
+    model.name = "NTM_-_" + controller_model.name
     model.batch_size = batch_size
     model.input_dim = input_dim
     model.output_dim = output_dim
 
-    ntm = NTM(output_dim, n_slots=n_slots, m_length=m_length, shift_range=3,
-              controller_architecture=controller_architecture,
+    ntm = NTM(output_dim, n_slots=n_slots, m_depth=m_depth, shift_range=3,
               controller_model=controller_model,
               return_sequences=True,
               input_shape=(None, input_dim), 
