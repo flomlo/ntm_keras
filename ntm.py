@@ -144,7 +144,9 @@ class NeuralTuringMachine(Recurrent):
     Currently batch_input_size is necessary. Or not? Im not even sure :(
 
     """
-    def __init__(self, units, n_slots, m_depth,
+    def __init__(self, units, 
+                        n_slots=50,
+                        m_depth=20,
                         shift_range=3,
                         controller_model=None,
                         batch_size=777,                 
@@ -227,7 +229,7 @@ class NeuralTuringMachine(Recurrent):
 
 
     # See chapter 3.1
-    def _read(self, weights, M):
+    def _read_from_memory(self, weights, M):
         return K.sum((weights[:, :, None]*M),axis=1)
 
     # See chapter 3.2
@@ -271,8 +273,9 @@ class NeuralTuringMachine(Recurrent):
 
     def _run_controller(self, inputs, read_vector):
         controller_input = K.concatenate([inputs, read_vector])
-        if len(self.controller.input_shape) is 3: # this catches controllers with state
-            controller_input = controller_input[:,None,:]
+        # TODO: broken?
+        #if len(self.controller.input_shape) is 3: # this catches controllers with state
+        #    controller_input = controller_input[:,None,:]
         controller_output = self.controller.call(controller_input)
         return controller_output
 
@@ -295,7 +298,7 @@ class NeuralTuringMachine(Recurrent):
 
         # We have the Memory M_tm1 (t minus one / t-1), and a read weighting w_read_tm1 calculated in the last
         # step. This is enough to calculate the read_vector we feed into the controller:
-        read_vector = self._read(w_read_tm1, M_tm1)
+        read_vector = self._read_from_memory(w_read_tm1, M_tm1)
 
         # Now feed the controller and let it run a single step, implemented by calling the step function directly,
         # which we have to provide with the actual input from outside, the information we've read an the states which
@@ -332,13 +335,13 @@ class NeuralTuringMachine(Recurrent):
         k_read          = controller_read_emitted_data[:, : self.m_depth] 
         k_read          += self.m_depth**-0.5 - 0.5
         beta_read       = controller_read_emitted_data[:, self.m_depth : self.m_depth + 1] 
-        beta_read       += 0.5 #actually I have no clue what a good magic value would be for that, but 1 is multiplication neutral
+        beta_read       += 0.5 #actually I have no clue what a good magic value would be for that, but 1 is multiplication neutral.
         g_read          = controller_read_emitted_data[:, self.m_depth + 1: self.m_depth + 1 + 1] 
         g_read          += 0.0  
         shift_read      = controller_read_emitted_data[:, self.m_depth + 1 + 1 : self.m_depth + 1 + 1 + self.shift_range]
         shift_read      = K.softmax(shift_read)  # normalize it via softmax
         gamma_read      = controller_read_emitted_data[:, -1 :]
-        gamma_read      = K.clip(gamma_read**-1, 1, 10) 
+        gamma_read      = K.clip(gamma_read**-1, 1, 10)  # this is certainly not perfect.
 
         k_write         = controller_write_emitted_data[:, : self.m_depth] 
         k_write         += self.m_depth**-0.5 -0.5
@@ -353,7 +356,8 @@ class NeuralTuringMachine(Recurrent):
         erase_vector    = controller_write_emitted_data[:, -2*self.m_depth : -self.m_depth]
         erase_vector    += 0 # erase vector must lie in (0,1). 
         add_vector      = controller_write_emitted_data[:, -self.m_depth : ]
-        add_vector      += -0.5 # zero is fine
+        add_vector      += 0 # as long as the add is positive and the memory is initialised properly, the memory will
+                             # never become 0.
 
 
         # Now we want to write to the memory.
