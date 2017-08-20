@@ -27,7 +27,7 @@ def gen_model(input_dim, batch_size, output_dim,
     model.output_dim = output_dim
 
     ntm = NTM(output_dim, n_slots=n_slots, m_depth=m_depth, shift_range=3,
-              controller_model=controller_model,
+              controller_model=None, #controller_model,
               return_sequences=True,
               input_shape=(None, input_dim), 
               batch_size = batch_size)
