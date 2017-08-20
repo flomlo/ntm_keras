@@ -45,7 +45,7 @@ def train_model(model, epochs=10, min_size=5, max_size=20, callbacks=None, verbo
                                                 max_size=max_size, min_size=min_size)
     if verboose:
         for j in range(epochs):
-            model.fit_generator(sample_generator, steps_per_epoch=15, epochs=j+1, callbacks=callbacks, initial_epoch=j)
+            model.fit_generator(sample_generator, steps_per_epoch=10, epochs=j+1, callbacks=callbacks, initial_epoch=j)
             print("currently at epoch {0}".format(j+1))
             for i in [5,10,20,40]:
                 test_model(model, sequence_length=i, verboose=True)

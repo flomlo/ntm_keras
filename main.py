@@ -70,7 +70,7 @@ elif modelType == 'ntm':
                                 activation='sigmoid',
                                 stateful=True,
                                 implementation=2,   # best for gpu. other ones also might not work.
-                                input_shape=(batch_size, None, controller_input_dim)))
+                                batch_input_shape=(batch_size, None, controller_input_dim)))
     else:
         raise ValueError("This controller_architecture is not implemented.")
 
