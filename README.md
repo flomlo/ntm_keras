@@ -64,6 +64,29 @@ used.
     sgd = Adam(lr=learning_rate, clipnorm=clipnorm)
     model.compile(loss='binary_crossentropy', optimizer=sgd, metrics = ['binary_accuracy'], sample_weight_mode="temporal")
 
+What if we instead want a more complex controller? Design it, e.g. double LSTM:
+    controller = Sequential()
+    controller.name=ntm_controller_architecture
+    controller.add(LSTM(units=150,
+                                stateful=True,
+                                implementation=2,   # best for gpu. other ones also might not work.
+                                batch_input_shape=(batch_size, None, controller_input_dim)))
+    controller.add(LSTM(units=controller_output_dim,
+                                activation='sigmoid',
+                                stateful=True,
+                                implementation=2))   # best for gpu. other ones also might not work.
+
+    controller.compile(loss='binary_crossentropy', optimizer=sgd, metrics = ['binary_accuracy'], sample_weight_mode="temporal")
+
+And now use the same code as above, only with controller_model=controller.
+
+Note that we used sigmoid as the last activation layer! This is currently necessary.
+Note that controller_input_dim and controller_output_dim can be calculated via controller_input_output_shape:
+    from ntm import controller_input_output_shape
+    controller_input_dim, controller_output_dim = ntm.controller_input_output_shape(
+                input_dim, output_dim, m_depth, n_slots, shift_range, 1,1) 
+
+
 
 
 
