@@ -1,4 +1,4 @@
-####The Neural Turing Machine
+#The Neural Turing Machine
 
 This code tries to implement the Neural Turing Machine, as found in 
 https://arxiv.org/abs/1410.5401, as a backend neutral recurrent keras layer.
@@ -37,8 +37,10 @@ From the outside, this implementation looks like a regular recurrent layer in ke
 It has however a number of non-obvious parameters:
 
 n_width: is the width of the memory matrix 
+
 m_depth: is the depth of the memory matrix (be careful about increasing that to much, it has quadratic influence on the
 number of trainable weights)
+
 controller_model: this parameter allows you to place a keras model of appropriate shape as the controller. the
 appropriate shape can be calculated via controller_input_output_shape. If None is set, a single dense layer will be
 used. 
