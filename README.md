@@ -91,6 +91,10 @@ Note that controller_input_dim and controller_output_dim can be calculated via c
                 input_dim, output_dim, m_depth, n_slots, shift_range, 1,1) 
 
 
+Also note that every statefull controller must carry around his own state, as was done here with 
+
+  stateful=True
+
 
 
 
