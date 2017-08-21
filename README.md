@@ -36,12 +36,12 @@ Have fun with the results!
 From the outside, this implementation looks like a regular recurrent layer in keras.
 It has however a number of non-obvious parameters:
 
-*  n_width: is the width of the memory matrix 
+*  n_width: This is the width of the memory matrix. Increasing this increases computational complexity in O(n). The
+   controller shape is not dependant on this, making weight transfer possible.
 
-*  m_depth: is the depth of the memory matrix (be careful about increasing that to much, it has quadratic influence on the
-number of trainable weights)
+*  m_depth: This is the depth of the memory matrix. Increasing this increases the number of trainable weights in O(n^2). It also changes controller shape. 
 
-*  controller_model: this parameter allows you to place a keras model of appropriate shape as the controller. the
+*  controller_model: This parameter allows you to place a keras model of appropriate shape as the controller. The
 appropriate shape can be calculated via controller_input_output_shape. If None is set, a single dense layer will be
 used. 
 
