@@ -36,12 +36,12 @@ Have fun with the results!
 From the outside, this implementation looks like a regular recurrent layer in keras.
 It has however a number of non-obvious parameters:
 
-n_width: is the width of the memory matrix 
+*  n_width: is the width of the memory matrix 
 
-m_depth: is the depth of the memory matrix (be careful about increasing that to much, it has quadratic influence on the
+*  m_depth: is the depth of the memory matrix (be careful about increasing that to much, it has quadratic influence on the
 number of trainable weights)
 
-controller_model: this parameter allows you to place a keras model of appropriate shape as the controller. the
+*  controller_model: this parameter allows you to place a keras model of appropriate shape as the controller. the
 appropriate shape can be calculated via controller_input_output_shape. If None is set, a single dense layer will be
 used. 
 
@@ -84,7 +84,7 @@ And now use the same code as above, only with controller_model=controller.
 Note that we used sigmoid as the last activation layer! This is currently necessary. Or at least another activation
 layer with middles at 0.5 and lies in the range of (0,1).
 
-Note that controller_input_dim and controller_output_dim can be calculated via controller_input_output_shape:
+Note that a correct controller_input_dim and controller_output_dim can be calculated via controller_input_output_shape:
 
     from ntm import controller_input_output_shape
     controller_input_dim, controller_output_dim = ntm.controller_input_output_shape(
@@ -93,7 +93,8 @@ Note that controller_input_dim and controller_output_dim can be calculated via c
 
 Also note that every statefull controller must carry around his own state, as was done here with 
 
-  stateful=True
+    stateful=True
+
 
 
 
