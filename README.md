@@ -44,6 +44,7 @@ number of trainable weights)
 controller_model: this parameter allows you to place a keras model of appropriate shape as the controller. the
 appropriate shape can be calculated via controller_input_output_shape. If None is set, a single dense layer will be
 used. 
+
     from keras.models import Sequential
     from keras.optimizers import Adam
     from ntm import NeuralTuringMachine as NTM
@@ -65,6 +66,7 @@ used.
     model.compile(loss='binary_crossentropy', optimizer=sgd, metrics = ['binary_accuracy'], sample_weight_mode="temporal")
 
 What if we instead want a more complex controller? Design it, e.g. double LSTM:
+
     controller = Sequential()
     controller.name=ntm_controller_architecture
     controller.add(LSTM(units=150,
