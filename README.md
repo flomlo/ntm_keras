@@ -44,6 +44,27 @@ number of trainable weights)
 controller_model: this parameter allows you to place a keras model of appropriate shape as the controller. the
 appropriate shape can be calculated via controller_input_output_shape. If None is set, a single dense layer will be
 used. 
+    from keras.models import Sequential
+    from keras.optimizers import Adam
+    from ntm import NeuralTuringMachine as NTM
+
+    model = Sequential()
+    model.name = "NTM_-_" + controller_model.name
+    model.batch_size = batch_size
+    model.input_dim = input_dim
+    model.output_dim = output_dim
+
+    ntm = NTM(output_dim, n_slots=50, m_depth=20, shift_range=3,
+              controller_model=None, #controller_model,
+              return_sequences=True,
+              input_shape=(None, input_dim), 
+              batch_size = batch_size)
+    model.add(ntm)
+
+    sgd = Adam(lr=learning_rate, clipnorm=clipnorm)
+    model.compile(loss='binary_crossentropy', optimizer=sgd, metrics = ['binary_accuracy'], sample_weight_mode="temporal")
+
+
 
 
 ## TODO:
