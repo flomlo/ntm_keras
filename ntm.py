@@ -1,34 +1,9 @@
-# History of this code:
 # This is all based on ntm.py found in the seya-repository of EderSantana, 
 # https://github.com/EderSantana/seya/blob/master/seya/layers/ntm.py
 # as (git clone)'d on 2017-07-12 or something like that.
 #
-# Problem: the code was written for keras 0.12 (?), and relied heavily on Theano as the backend.
-#
-# This code was then reworked by me, and by reworking I mean: cluelessly debugging, trying to understand what it does,
-# even looking up ancient keras documentation in the wayback machine (*cries*), rewriting all that to something which seems
-# like the semantic equivalence in Keras 2, Backend neutral code.
-# That would have gone quicker if I've either understood Keras, Theno, Python debugging or what the NTM even does.
-#
-# After that, and hours of debugging numerical features due to wrong initialization of vectors it then finally worked.
-# By working I mean: All the actual interaction with the memory was completly broken. Just didnt work, behaved like a
-# layer consisting solely like a LSTM (which makes quite a lot of sense)
-#
-# After a few days it dawned me that quite a lot of the topological descriptions were utter failures. Maybe I interpreted
-# the original code wrong, or there were even bigger changes in the API than I ever understood. 
-# 
-# After that I rewrote almost everything that was left. The only thing semantically original are the helper functions
-# which do *exactly* what is described in the NTM-Paper, and the _circulant function, which is actually quite nice!
-# 
-# But all in all, I really want to thank EderSantana. It was a shitload of work, but without his code to work on, and
-# inproving in small steps until I really understood what I was doing, I would have never tried anyway.
-#
-# Also the overall idea of understanding the NTM as a recurrent layer to be used inside another model (and not solely as
-# model by itself, not embeddable at all), which was his, might turn out to be visionary. Lets see.
-
-# Oh, before I forget: In the end, I consider copyright to this code with exception to _circulant, considering the other
-# helper functions as prior art (which was in the NTM paper), to lay with me. As far as copyright for some
-# implementation for some idea found in some paper can lay in anybodies hands.
+# It was then, syntactically (and for large parts even semtantically) completely rewritten.
+# But the core idea, to understand it as a Keras recurrent layer, is his.
 #
 # If I understand correctly, the perfect License for "leave me alone I dont care" would be BSD 3 (which is the same for
 # EderSantanas original code, just in doubt).
@@ -83,10 +58,14 @@ def _renorm(x):
 def _cosine_distance(M, k):
     # this is equation (6), or as I like to call it: The NaN factory.
     # TODO: Find it in a library (keras cosine loss?)
+    # normalizing first as it is better conditioned.
     nk = K.l2_normalize(k, axis=-1)
     nM = K.l2_normalize(M, axis=-1)
     cosine_distance = K.batch_dot(nM, nk)
-    #cosine_distance = tf.Print(cosine_distance, [nM[0], nk[0], cosine_distance[0]], message="_cosine_distance_numbers")
+    #cosine_distance_error_handling = tf.Print(cosine_distance, [cosine_distance], message="NaN occured in _cosine_distance")
+    #cosine_distance_error_handling = K.ones(cosine_distance_error_handling.shape)
+    #cosine_distance = tf.case({K.any(tf.is_nan(cosine_distance)) : (lambda: cosine_distance_error_handling)},
+    #        default = lambda: cosine_distance, strict=True)
     return cosine_distance
 
 def _controller_read_head_emitting_dim(m_depth, shift_range):
@@ -356,8 +335,7 @@ class NeuralTuringMachine(Recurrent):
         erase_vector    = controller_write_emitted_data[:, -2*self.m_depth : -self.m_depth]
         erase_vector    += 0 # erase vector must lie in (0,1). 
         add_vector      = controller_write_emitted_data[:, -self.m_depth : ]
-        add_vector      += 0 # as long as the add is positive and the memory is initialised properly, the memory will
-                             # never become 0.
+        add_vector      += -0.5 # even if it makes zero vectors in the memory easier, the ability to have negative values in the memore enhances the models a lot.
 
 
         # Now we want to write to the memory.
