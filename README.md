@@ -45,21 +45,20 @@ controller_model: this parameter allows you to place a keras model of appropriat
 appropriate shape can be calculated via controller_input_output_shape. If None is set, a single dense layer will be
 used. 
 
+More or less minimal code example:
+
     from keras.models import Sequential
     from keras.optimizers import Adam
     from ntm import NeuralTuringMachine as NTM
 
     model = Sequential()
     model.name = "NTM_-_" + controller_model.name
-    model.batch_size = batch_size
-    model.input_dim = input_dim
-    model.output_dim = output_dim
 
     ntm = NTM(output_dim, n_slots=50, m_depth=20, shift_range=3,
-              controller_model=None, #controller_model,
+              controller_model=None,
               return_sequences=True,
               input_shape=(None, input_dim), 
-              batch_size = batch_size)
+              batch_size = 100)
     model.add(ntm)
 
     sgd = Adam(lr=learning_rate, clipnorm=clipnorm)
@@ -82,8 +81,11 @@ What if we instead want a more complex controller? Design it, e.g. double LSTM:
 
 And now use the same code as above, only with controller_model=controller.
 
-Note that we used sigmoid as the last activation layer! This is currently necessary.
+Note that we used sigmoid as the last activation layer! This is currently necessary. Or at least another activation
+layer with middles at 0.5 and lies in the range of (0,1).
+
 Note that controller_input_dim and controller_output_dim can be calculated via controller_input_output_shape:
+
     from ntm import controller_input_output_shape
     controller_input_dim, controller_output_dim = ntm.controller_input_output_shape(
                 input_dim, output_dim, m_depth, n_slots, shift_range, 1,1) 
