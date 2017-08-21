@@ -82,7 +82,7 @@ What if we instead want a more complex controller? Design it, e.g. double LSTM:
 And now use the same code as above, only with controller_model=controller.
 
 Note that we used sigmoid as the last activation layer! This is currently necessary. Or at least another activation
-layer with middles at 0.5 and lies in the range of (0,1).
+layer with idles at 0.5 and lies in the range of (0,1).
 
 Note that a correct controller_input_dim and controller_output_dim can be calculated via controller_input_output_shape:
 
