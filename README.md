@@ -1,4 +1,4 @@
-#The Neural Turing Machine
+# The Neural Turing Machine
 
 This code tries to implement the Neural Turing Machine, as found in 
 https://arxiv.org/abs/1410.5401, as a backend neutral recurrent keras layer.
