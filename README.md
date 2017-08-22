@@ -9,6 +9,8 @@
 * Unfortunately we lost backend neutrality: As tf.slice is used extensivly, we have to either try getting K.slice or
   have to do a case distinction over backend. Use the old version if you need another backend than tensorflow! And
   please write me a message.
+* For reasons completely beyond my understanding, it is now about half as slow. Will look into it.
+* Statefull controllers finally work. I always thought they worked, turns out the testing routine was broken :|
 
 # The Neural Turing Machine
 ### Introduction
@@ -16,6 +18,8 @@ This code tries to implement the Neural Turing Machine, as found in
 https://arxiv.org/abs/1410.5401, as a backend neutral recurrent keras layer.
 
 A very default experiment, the copy task, is provided, too.
+
+In the end there is a TODO-List. Help would be appreciated!
 
 NOTE:
 * There is a nicely formatted paper describing the rough idea of the NTM, implementation difficulties and which discusses the
@@ -142,4 +146,5 @@ Also note that every statefull controller must carry around his own state, as wa
 - [x] A bit of code cleaning: especially the controller output splitting is ugly as hell.
 - [x] Support for arbitrary activation functions would be nice, currently restricted to sigmoid.
 - [ ] Make it backend neutral again! Some testing might be nice, too. 
+- [ ] Bring it up to speed again.
 - [ ] Maybe add the other experiments of the original paper?
