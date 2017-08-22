@@ -1,4 +1,12 @@
 # The Neural Turing Machine
+### Changelog:
+* The most important: Controller models now have to have linear activation. The activation of the NTM-Layer is selected
+  by the new parameter "activation". For all the stuff that interacts with the memory we now have very precise
+  activations for each and everyone of these parameters, all of them asuming that the input is not pre-activated. 
+* There is now support for multiple read/write heads! Use the parameters read_heads resp. write_heads at Initialisation.
+* The code was cleaned a lot.
+* Unfortunately we lost backend neutrality: As tf.slice is used extensivly, we have to either try getting K.slice or
+  have to do a case distinction over backend. Use the old version if you need another backend than tensorflow!
 
 This code tries to implement the Neural Turing Machine, as found in 
 https://arxiv.org/abs/1410.5401, as a backend neutral recurrent keras layer.
@@ -100,9 +108,9 @@ Also note that every statefull controller must carry around his own state, as wa
 
 
 ## TODO:
-* Arbitrary number of read and write heads
-* Support of masking, and maybe dropout, one has to reason about it theoretically first.
-* support for get and set config to better enable model saving
-* A bit of code cleaning: especially the controller output splitting is ugly as hell.
-* Although it should be backend neutral, some testing with other backends might be nice.
-* Support for arbitrary activation functions would be nice, currently restricted to sigmoid.
+- [x] Arbitrary number of read and write heads
+- [ ] Support of masking, and maybe dropout, one has to reason about it theoretically first.
+- [ ] support for get and set config to better enable model saving
+- [x] A bit of code cleaning: especially the controller output splitting is ugly as hell.
+- [x] Support for arbitrary activation functions would be nice, currently restricted to sigmoid.
+- [ ] Make it backend neutral again! Some testing might be nice, too. 
