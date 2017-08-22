@@ -100,7 +100,8 @@ What if we instead want a more complex controller? Design it, e.g. double LSTM:
                         stateful=True,
                         implementation=2))   # best for gpu. other ones also might not work.
 
-    controller.compile(loss='binary_crossentropy', optimizer=sgd, metrics = ['binary_accuracy'], sample_weight_mode="temporal")
+    controller.compile(loss='binary_crossentropy', optimizer=sgd,
+                     metrics = ['binary_accuracy'], sample_weight_mode="temporal")
 
 And now use the same code as above, only with controller_model=controller.
 
