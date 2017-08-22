@@ -1,7 +1,8 @@
 ### Changelog 0.2:
-* The most important: Controller models now have to have linear activation. The activation of the NTM-Layer is selected
-  by the new parameter "activation" (default: "linear"). For all the stuff that interacts with the memory we now have very precise
-  activations for each and everyone of these parameters, all of them asuming that the input is not pre-activated. 
+* API CHANGE: Controller models now must have linear activation. The activation of the NTM-Layer is selected
+  by the new parameter "activation" (default: "linear"). For all the stuff that interacts with the memory we now
+  have very precise handselected activations which asume that there was no prior de-linearisation.
+  This requirement on the controller will probably be final.
 * There is now support for multiple read/write heads! Use the parameters read_heads resp. write_heads at initialisation
   (by default both are 1).
 * The code around controller output splitting and activation was completely rewritten and cleaned from a lot of
@@ -9,9 +10,9 @@
 * Unfortunately we lost backend neutrality: As tf.slice is used extensivly, we have to either try getting K.slice or
   have to do a case distinction over backend. Use the old version if you need another backend than tensorflow! And
   please write me a message.
-* For reasons completely beyond my understanding, it is now about half as slow. Which is interesting, as the changes
-  I've made should actually speed it up. Will look into it.
-* Stateful models do not work anymore. Actually they never worked, the testing routine was broken.
+* As less activations have to be computed, it is now a tiny little bit faster (~1%).
+* Stateful models do not work anymore. Actually they never worked, the testing routine was just broken. Will be repaired
+  asap.
 
 # The Neural Turing Machine
 ### Introduction
