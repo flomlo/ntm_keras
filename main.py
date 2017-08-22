@@ -11,7 +11,7 @@ output_dim = 8
 input_dim = output_dim + 2  # this is the actual input dim of the network, that includes two dims for flags
 batch_size = 100
 read_heads = 1
-write_heads = 2
+write_heads = 1
 
 #testrange=[5,10,20,40,80,160]
 
