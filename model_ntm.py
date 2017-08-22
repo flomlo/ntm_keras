@@ -18,7 +18,10 @@ clipnorm = 10
 def gen_model(input_dim, batch_size, output_dim,
                 n_slots=n_slots,
                 m_depth=m_depth,
-                controller_model=None):
+                controller_model=None,
+                activation="sigmoid",
+                read_heads = 1,
+                write_heads = 1):
 
     model = Sequential()
     model.name = "NTM_-_" + controller_model.name
@@ -27,7 +30,10 @@ def gen_model(input_dim, batch_size, output_dim,
     model.output_dim = output_dim
 
     ntm = NTM(output_dim, n_slots=n_slots, m_depth=m_depth, shift_range=3,
-              controller_model=None, #controller_model,
+              controller_model=controller_model,
+              activation=activation,
+              read_heads = read_heads,
+              write_heads = write_heads,
               return_sequences=True,
               input_shape=(None, input_dim), 
               batch_size = batch_size)

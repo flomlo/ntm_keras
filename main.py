@@ -10,9 +10,9 @@ from keras.initializers import RandomNormal
 output_dim = 8
 input_dim = output_dim + 2  # this is the actual input dim of the network, that includes two dims for flags
 batch_size = 100
+read_heads = 1
+write_heads = 2
 
-controller_input_dim = 30
-controller_output_dim = 100
 #testrange=[5,10,20,40,80,160]
 
 
@@ -44,6 +44,10 @@ elif modelType == 'dense':
 
 elif modelType == 'ntm':
     import model_ntm
+    from ntm import controller_input_output_shape as controller_shape
+
+    controller_input_dim, controller_output_dim = controller_shape(input_dim, output_dim, 20, 128, 3, read_heads,
+            write_heads)
 
     controller = Sequential()
     controller.name=ntm_controller_architecture
@@ -51,23 +55,23 @@ elif modelType == 'ntm':
         controller.add(Dense(units=controller_output_dim,
                                 kernel_initializer=sameInit,
                                 bias_initializer=sameInit,
-                                activation='sigmoid',
+                                activation='linear',
                                 input_dim=controller_input_dim))
     elif ntm_controller_architecture == "double_dense":
         controller.add(Dense(units=150,
                                 kernel_initializer=sameInit,
                                 bias_initializer=sameInit,
-                                activation='sigmoid',
+                                activation='linear',
                                 input_dim=controller_input_dim))
         controller.add(Dense(units=controller_output_dim,
                                 kernel_initializer=sameInit,
                                 bias_initializer=sameInit,
-                                activation='sigmoid'))
+                                activation='linear'))
     elif ntm_controller_architecture == "lstm":
         controller.add(LSTM(units=controller_output_dim,
                                 kernel_initializer='random_normal', 
                                 bias_initializer='random_normal',
-                                activation='sigmoid',
+                                activation='linear',
                                 stateful=True,
                                 implementation=2,   # best for gpu. other ones also might not work.
                                 batch_input_shape=(batch_size, None, controller_input_dim)))
@@ -77,7 +81,8 @@ elif modelType == 'ntm':
     controller.compile(loss='binary_crossentropy', optimizer=sgd, metrics = ['binary_accuracy'], sample_weight_mode="temporal")
         
     model = model_ntm.gen_model(input_dim=input_dim, output_dim=output_dim, batch_size=batch_size,
-                                    controller_model=controller)
+                                    controller_model=controller, read_heads=read_heads, write_heads=write_heads,
+                                    activation="sigmoid")
 else:
     raise ValueError("this model is not implemented")
 
