@@ -1,43 +1,57 @@
-# The Neural Turing Machine
-### Changelog:
+### Changelog 0.2:
 * The most important: Controller models now have to have linear activation. The activation of the NTM-Layer is selected
-  by the new parameter "activation". For all the stuff that interacts with the memory we now have very precise
+  by the new parameter "activation" (default: "linear"). For all the stuff that interacts with the memory we now have very precise
   activations for each and everyone of these parameters, all of them asuming that the input is not pre-activated. 
-* There is now support for multiple read/write heads! Use the parameters read_heads resp. write_heads at Initialisation.
-* The code was cleaned a lot.
+* There is now support for multiple read/write heads! Use the parameters read_heads resp. write_heads at initialisation
+  (by default both are 1).
+* The code around controller output splitting and activation was completely rewritten and cleaned from a lot of
+  copy-paste-code.
 * Unfortunately we lost backend neutrality: As tf.slice is used extensivly, we have to either try getting K.slice or
-  have to do a case distinction over backend. Use the old version if you need another backend than tensorflow!
+  have to do a case distinction over backend. Use the old version if you need another backend than tensorflow! And
+  please write me a message.
 
+# The Neural Turing Machine
+### Introduction
 This code tries to implement the Neural Turing Machine, as found in 
 https://arxiv.org/abs/1410.5401, as a backend neutral recurrent keras layer.
+
+A very default experiment, the copy task, is provided, too.
 
 NOTE:
 * There is a nicely formatted paper describing the rough idea of the NTM, implementation difficulties and which discusses the
   copy experiment. It is available here in the repository as The_NTM_-_Introduction_And_Implementation.pdf. 
 * You may want to change the LOGDIR_BASE in testing_utils.py to something that works for you or just set a symbolic
   link.
-* So far one read and one write head is hardcoded into the system. This will probably be fixed in a future update.
 
 
 ### User guide
-For a quick start on the copy Task, type 
+For a quick start on the copy task, type 
 
     python main.py -v ntm
 
-while in a python enviroment which has tensorflow, keras, numpy. tensorflow-gpu is recommend, as everything is about 20x
-faster. In my case this takes about 100 minutes on a NVIDIA GTX 1050 Ti.
+while in a python enviroment which has tensorflow, keras and numpy.
+Having tensorflow-gpu is recommend, as everything is about 20x faster.
+In my case this experiment takes about 100 minutes on a NVIDIA GTX 1050 Ti.
 The -v is optional and offers much more detailed information about the achieved accuracy, and also after every training
 epoch.
+Logging data is written LOGDIR_BASE, which is ./logs/ by default. View them with tensorboard:
 
-Compare that with
+    tensorboard --logdir ./logs
+
+If you've luck and not had a terrible run (that can happen, unfortunately), you now have a machine capable of copying a
+given sequence! I wonder if we've achieved that any other way ...
+
+These results are especially interesting compared to an LSTM model: Run
 
     python main.py lstm
 
 This builds 3 layers of LSTM with and goes through the same testing procedure
 as above, which for me resulted in a training time of approximately 1h (same GPU) and 
-(roughly) 100%, 100%, 94%, 50%, 50% accuracy at the respective test lengths. 
+(roughly) 100%, 100%, 94%, 50%, 50% accuracy at the respective test lengths.
+This shows that the NTM has advantages over LSTM in some cases. Especially considering the LSTM model has about 807.200
+trainable parameters while the NTM had a mere 3100! 
 
-Have fun with the results!
+Have fun playing around, maybe with other controllers? dense, double_dense and lstm are build in.
 
 
 ### API
@@ -81,7 +95,7 @@ What if we instead want a more complex controller? Design it, e.g. double LSTM:
                                 implementation=2,   # best for gpu. other ones also might not work.
                                 batch_input_shape=(batch_size, None, controller_input_dim)))
     controller.add(LSTM(units=controller_output_dim,
-                                activation='sigmoid',
+                                activation='linear',
                                 stateful=True,
                                 implementation=2))   # best for gpu. other ones also might not work.
 
@@ -89,14 +103,14 @@ What if we instead want a more complex controller? Design it, e.g. double LSTM:
 
 And now use the same code as above, only with controller_model=controller.
 
-Note that we used sigmoid as the last activation layer! This is currently necessary. Or at least another activation
-layer with idles at 0.5 and lies in the range of (0,1).
+Note that we used linear as the last activation layer! This is of critical importance.
+The activation of the NTM-layer can be set the parameter activation (default: linear).
 
 Note that a correct controller_input_dim and controller_output_dim can be calculated via controller_input_output_shape:
 
     from ntm import controller_input_output_shape
     controller_input_dim, controller_output_dim = ntm.controller_input_output_shape(
-                input_dim, output_dim, m_depth, n_slots, shift_range, 1,1) 
+                input_dim, output_dim, m_depth, n_slots, shift_range, read_heads, write_heads) 
 
 
 Also note that every statefull controller must carry around his own state, as was done here with 
@@ -114,3 +128,4 @@ Also note that every statefull controller must carry around his own state, as wa
 - [x] A bit of code cleaning: especially the controller output splitting is ugly as hell.
 - [x] Support for arbitrary activation functions would be nice, currently restricted to sigmoid.
 - [ ] Make it backend neutral again! Some testing might be nice, too. 
+- [ ] Maybe add the other experiments of the original paper?
