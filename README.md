@@ -58,14 +58,25 @@ Have fun playing around, maybe with other controllers? dense, double_dense and l
 From the outside, this implementation looks like a regular recurrent layer in keras.
 It has however a number of non-obvious parameters:
 
-*  n_width: This is the width of the memory matrix. Increasing this increases computational complexity in O(n). The
+#### Hyperparameters
+
+*  n_width: This is the width of the memory matrix. Increasing this increases computational complexity in O(n^2). The
    controller shape is not dependant on this, making weight transfer possible.
 
-*  m_depth: This is the depth of the memory matrix. Increasing this increases the number of trainable weights in O(n^2). It also changes controller shape. 
+*  m_depth: This is the depth of the memory matrix. Increasing this increases the number of trainable weights in O(m^2). It also changes controller shape. 
 
 *  controller_model: This parameter allows you to place a keras model of appropriate shape as the controller. The
 appropriate shape can be calculated via controller_input_output_shape. If None is set, a single dense layer will be
 used. 
+
+*  read_heads: The number of read heads this NTM should have. Has quadratic influence on the number of trainable
+   weights. Default: 1
+
+*  write_heads: The number of write heads this NTM should have. Has quadratic influence on the number of trainable
+   weights, but for small numbers a *huge* impact. Default: 1
+
+
+#### Usage
 
 More or less minimal code example:
 
