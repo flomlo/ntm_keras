@@ -146,13 +146,19 @@ class NeuralTuringMachine(Recurrent):
         self.n_slots = n_slots
         self.m_depth = m_depth
         self.shift_range = shift_range
-        self.controller_model = controller_model
+        self.controller = controller_model
         self.activation = get_activations(activation)
         self.read_heads = read_heads
         self.write_heads = write_heads
         self.batch_size = batch_size
+
 #        self.return_sequence = True
-        self.stateful = stateful
+        try:
+            if controller.state.stateful:
+                self.controller_with_state = True 
+        except:
+            self.controller_with_state = False
+
 
         self.controller_read_head_emitting_dim = _controller_read_head_emitting_dim(m_depth, shift_range)
         self.controller_write_head_emitting_dim = _controller_write_head_emitting_dim(m_depth, shift_range)
@@ -167,7 +173,7 @@ class NeuralTuringMachine(Recurrent):
                 self.write_heads)
             
         # Now that we've calculated the shape of the controller, we have add it to the layer/model.
-        if self.controller_model is None:
+        if self.controller is None:
             self.controller = Dense(
                 name = "controller",
                 activation = 'linear',
@@ -175,10 +181,8 @@ class NeuralTuringMachine(Recurrent):
                 units = self.controller_output_dim,
                 input_shape = (bs, input_length, self.controller_input_dim))
             self.controller.build(input_shape=(self.batch_size, input_length, self.controller_input_dim))
-        else:
-            # Oh man, handling a whole fucking model as a controller is very very cool.
-            # Keras is da shit.
-            self.controller = self.controller_model
+            self.controller_with_state = False
+
 
         # This is a fixed shift matrix
         self.C = _circulant(self.n_slots, self.shift_range)
@@ -260,9 +264,15 @@ class NeuralTuringMachine(Recurrent):
 
     def _run_controller(self, inputs, read_vector):
         controller_input = K.concatenate([inputs, read_vector])
-        if hasattr(self.controller, 'stateful'): # this catches controllers with state
+        import pudb; pu.db
+        if self.controller_with_state or len(self.controller.input_shape) == 3:
             controller_input = controller_input[:,None,:]
-        controller_output = self.controller.call(controller_input)
+            controller_output = self.controller.call(controller_input)
+            if self.controller.output_shape == 3:
+                controller_output = controller_output[:,0,:]
+        else:
+            controller_output = self.controller.call(controller_input)
+
         return controller_output
 
     def _split_and_apply_activations(self, controller_output):
@@ -300,10 +310,10 @@ class NeuralTuringMachine(Recurrent):
         
         #activation
         ntm_output = self.activation(ntm_output)
-        controller_instructions_read = [(k, hard_sigmoid(beta)+0.5, sigmoid(g), softmax(hard_sigmoid(shift)), 10*sigmoid(gamma)) for
+        controller_instructions_read = [(k, hard_sigmoid(beta)+0.5, sigmoid(g), softmax(shift), 1 + 9*sigmoid(gamma)) for
                 (k, beta, g, shift, gamma) in controller_instructions_read]
         controller_instructions_write = [
-                (k, hard_sigmoid(beta)+0.5, sigmoid(g), softmax(hard_sigmoid(shift)), 10*sigmoid(gamma), hard_sigmoid(erase_vector), tanh(add_vector))  for 
+                (k, hard_sigmoid(beta)+0.5, sigmoid(g), softmax(shift), 1 + 9*sigmoid(gamma), hard_sigmoid(erase_vector), tanh(add_vector))  for 
                 (k, beta, g, shift, gamma, erase_vector, add_vector) in controller_instructions_write]
        
         return (ntm_output, controller_instructions_read, controller_instructions_write)
