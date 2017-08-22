@@ -60,7 +60,7 @@ It has however a number of non-obvious parameters:
 
 #### Hyperparameters
 
-*  n_width: This is the width of the memory matrix. Increasing this increases computational complexity in O(n^2). The
+*  '<n_width>': This is the width of the memory matrix. Increasing this increases computational complexity in O(n^2). The
    controller shape is not dependant on this, making weight transfer possible.
 
 *  m_depth: This is the depth of the memory matrix. Increasing this increases the number of trainable weights in O(m^2). It also changes controller shape. 
