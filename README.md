@@ -84,20 +84,21 @@ More or less minimal code example:
     model.add(ntm)
 
     sgd = Adam(lr=learning_rate, clipnorm=clipnorm)
-    model.compile(loss='binary_crossentropy', optimizer=sgd, metrics = ['binary_accuracy'], sample_weight_mode="temporal")
+    model.compile(loss='binary_crossentropy', optimizer=sgd,
+                   metrics = ['binary_accuracy'], sample_weight_mode="temporal")
 
 What if we instead want a more complex controller? Design it, e.g. double LSTM:
 
     controller = Sequential()
     controller.name=ntm_controller_architecture
     controller.add(LSTM(units=150,
-                                stateful=True,
-                                implementation=2,   # best for gpu. other ones also might not work.
-                                batch_input_shape=(batch_size, None, controller_input_dim)))
+                        stateful=True,
+                        implementation=2,   # best for gpu. other ones also might not work.
+                        batch_input_shape=(batch_size, None, controller_input_dim)))
     controller.add(LSTM(units=controller_output_dim,
-                                activation='linear',
-                                stateful=True,
-                                implementation=2))   # best for gpu. other ones also might not work.
+                        activation='linear',
+                        stateful=True,
+                        implementation=2))   # best for gpu. other ones also might not work.
 
     controller.compile(loss='binary_crossentropy', optimizer=sgd, metrics = ['binary_accuracy'], sample_weight_mode="temporal")
 
