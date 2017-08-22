@@ -260,7 +260,7 @@ class NeuralTuringMachine(Recurrent):
 
     def _run_controller(self, inputs, read_vector):
         controller_input = K.concatenate([inputs, read_vector])
-        if self.controller.stateful: # this catches controllers with state
+        if hasattr(self.controller, 'stateful'): # this catches controllers with state
             controller_input = controller_input[:,None,:]
         controller_output = self.controller.call(controller_input)
         return controller_output
