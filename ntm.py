@@ -260,9 +260,8 @@ class NeuralTuringMachine(Recurrent):
 
     def _run_controller(self, inputs, read_vector):
         controller_input = K.concatenate([inputs, read_vector])
-        # TODO: broken?
-        #if len(self.controller.input_shape) is 3: # this catches controllers with state
-        #    controller_input = controller_input[:,None,:]
+        if self.controller.stateful: # this catches controllers with state
+            controller_input = controller_input[:,None,:]
         controller_output = self.controller.call(controller_input)
         return controller_output
 
@@ -374,6 +373,7 @@ class NeuralTuringMachine(Recurrent):
             weight_vector = self._get_weight_vector(M, old_weight_vector, *read_head)
             weights_read.append(weight_vector)
 
+        # M = tf.Print(M, [K.mean(M), K.max(M), K.min(M)], message="Memory overview")
         # Now lets pack up the state in a list and call it a day.
         return ntm_output, [ntm_output, M, K.stack(weights_read, axis=1), K.stack(weights_write, axis=1)] 
 
