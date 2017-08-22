@@ -50,7 +50,7 @@ def train_model(model, epochs=10, min_size=5, max_size=20, callbacks=None, verbo
             for i in [5,10,20,40]:
                 test_model(model, sequence_length=i, verboose=True)
     else:
-        model.fit_generator(sample_generator, steps_per_epoch=15, epochs=epochs, callbacks=callbacks)
+        model.fit_generator(sample_generator, steps_per_epoch=10, epochs=epochs, callbacks=callbacks)
 
     print("done training")
 
@@ -60,7 +60,7 @@ def lengthy_test(model, testrange=[5,10,20,40,80], epochs=100, verboose=True):
     log_path = LOG_PATH_BASE + ts + "_-_" + model.name 
     tensorboard = TensorBoard(log_dir=log_path,
                                 write_graph=False, #This eats a lot of space. Enable with caution!
-                                histogram_freq = 1,
+                                #histogram_freq = 1,
                                 write_images=True,
                                 batch_size = model.batch_size,
                                 write_grads=True)
