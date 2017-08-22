@@ -9,8 +9,9 @@
 * Unfortunately we lost backend neutrality: As tf.slice is used extensivly, we have to either try getting K.slice or
   have to do a case distinction over backend. Use the old version if you need another backend than tensorflow! And
   please write me a message.
-* For reasons completely beyond my understanding, it is now about half as slow. Will look into it.
-* Statefull controllers finally work. I always thought they worked, turns out the testing routine was broken :|
+* For reasons completely beyond my understanding, it is now about half as slow. Which is interesting, as the changes
+  I've made should actually speed it up. Will look into it.
+* Stateful models do not work anymore. Actually they never worked, the testing routine was broken.
 
 # The Neural Turing Machine
 ### Introduction
