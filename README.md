@@ -148,5 +148,5 @@ Also note that every statefull controller must carry around his own state, as wa
 - [x] A bit of code cleaning: especially the controller output splitting is ugly as hell.
 - [x] Support for arbitrary activation functions would be nice, currently restricted to sigmoid.
 - [ ] Make it backend neutral again! Some testing might be nice, too. 
-- [ ] Bring it up to speed again.
 - [ ] Maybe add the other experiments of the original paper?
+- [ ] Mooaaar speeeed. Look if there are platant performance optimisations possible. 
