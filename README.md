@@ -45,7 +45,7 @@ Logging data is written LOGDIR_BASE, which is ./logs/ by default. View them with
     tensorboard --logdir ./logs
 
 If you've luck and not had a terrible run (that can happen, unfortunately), you now have a machine capable of copying a
-given sequence! I wonder if we've achieved that any other way ...
+given sequence! I wonder if we could have achieved that any other way ...
 
 These results are especially interesting compared to an LSTM model: Run
 
