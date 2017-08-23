@@ -264,7 +264,6 @@ class NeuralTuringMachine(Recurrent):
 
     def _run_controller(self, inputs, read_vector):
         controller_input = K.concatenate([inputs, read_vector])
-        import pudb; pu.db
         if self.controller_with_state or len(self.controller.input_shape) == 3:
             controller_input = controller_input[:,None,:]
             controller_output = self.controller.call(controller_input)
@@ -310,10 +309,10 @@ class NeuralTuringMachine(Recurrent):
         
         #activation
         ntm_output = self.activation(ntm_output)
-        controller_instructions_read = [(k, hard_sigmoid(beta)+0.5, sigmoid(g), softmax(shift), 1 + 9*sigmoid(gamma)) for
+        controller_instructions_read = [(tanh(k), hard_sigmoid(beta)+0.5, sigmoid(g), softmax(shift), 1 + 9*sigmoid(gamma)) for
                 (k, beta, g, shift, gamma) in controller_instructions_read]
         controller_instructions_write = [
-                (k, hard_sigmoid(beta)+0.5, sigmoid(g), softmax(shift), 1 + 9*sigmoid(gamma), hard_sigmoid(erase_vector), tanh(add_vector))  for 
+                (tanh(k), hard_sigmoid(beta)+0.5, sigmoid(g), softmax(shift), 1 + 9*sigmoid(gamma), hard_sigmoid(erase_vector), tanh(add_vector))  for 
                 (k, beta, g, shift, gamma, erase_vector, add_vector) in controller_instructions_write]
        
         return (ntm_output, controller_instructions_read, controller_instructions_write)
