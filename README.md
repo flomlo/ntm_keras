@@ -144,9 +144,9 @@ Also note that every statefull controller must carry around his own state, as wa
 ## TODO:
 - [x] Arbitrary number of read and write heads
 - [ ] Support of masking, and maybe dropout, one has to reason about it theoretically first.
-- [ ] support for get and set config to better enable model saving
+- [ ] Support for get and set config to better enable model saving
 - [x] A bit of code cleaning: especially the controller output splitting is ugly as hell.
 - [x] Support for arbitrary activation functions would be nice, currently restricted to sigmoid.
 - [ ] Make it backend neutral again! Some testing might be nice, too. 
 - [ ] Maybe add the other experiments of the original paper?
-- [ ] Mooaaar speeeed. Look if there are platant performance optimisations possible. 
+- [ ] Mooaaar speeeed. Look if there are platant performance optimizations possible. 
